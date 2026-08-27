@@ -18,6 +18,24 @@ Fonctionne entièrement sur **Google Apps Script + Google Sheets** : gratuit, au
 - Mention d'information RGPD/CNIL affichée directement dans l'application
 - Crédit du projet open source et lien vers le dépôt
 
+## ⚠️ Géolocalisation sur iPhone/Safari — pourquoi deux interfaces ?
+
+Les pages servies directement par Apps Script (`Index.html`, via `doGet`) tournent dans un **iframe sandboxé** imposé par Google. Cet iframe ne délègue pas la permission de géolocalisation à son contenu : sur Safari iOS en particulier, `navigator.geolocation` est systématiquement refusé, **quels que soient les réglages du site dans Safari** — le blocage se fait au niveau de l'iframe, pas du site.
+
+Pour contourner ce problème, le projet fournit une **deuxième interface**, `docs/index.html`, pensée pour être hébergée en dehors d'Apps Script via **GitHub Pages** (gratuit, directement depuis ce dépôt). Cette page est un site web normal, sans sandbox : la géolocalisation s'y comporte comme sur n'importe quel site (demande de permission une seule fois, mémorisée ensuite par le navigateur).
+
+Cette page appelle Apps Script uniquement comme backend (`doPost`), qui reste le seul endroit où les données sont écrites dans le Sheet.
+
+**C'est cette page (`docs/index.html`, hébergée sur GitHub Pages) qu'il faut utiliser pour le QR code**, pas l'URL `.../exec` d'Apps Script.
+
+### Activer GitHub Pages
+
+1. Dans les paramètres du dépôt GitHub : **Settings > Pages**.
+2. Source : branche `main`, dossier `/docs`.
+3. L'URL générée ressemble à `https://5136siegfried.github.io/cesu-pointage-geoloc/`.
+4. Dans `docs/index.html`, remplacer `APPS_SCRIPT_URL` par l'URL de déploiement Apps Script (celle qui se termine par `/exec`).
+5. Générer le QR code à partir de cette URL GitHub Pages, pas de l'URL Apps Script.
+
 ## Installation
 
 1. Créer un Google Sheet vide.
@@ -44,7 +62,13 @@ Chaque pointage crée une ligne dans l'onglet **Pointages** du Google Sheet, ave
 - un statut (`OK` ou `À VÉRIFIER — hors zone`)
 - une case à cocher **Vérifié par le manager**, à cocher une fois la ligne contrôlée
 
-Aucune interface séparée n'est nécessaire : le manager (l'employeur) travaille directement dans le Sheet.
+Les lignes se colorent automatiquement (rouge = à vérifier, vert = OK) grâce à une mise en forme conditionnelle créée dès le premier pointage.
+
+Un onglet **"Tableau de bord"** est créé automatiquement en première position à l'ouverture de l'application. Il affiche en direct, sans aucune action manuelle :
+- à gauche : les anomalies **non encore traitées** (statut à vérifier et case non cochée), triées de la plus récente à la plus ancienne
+- à droite : les 20 derniers pointages, quel que soit leur statut
+
+Dès qu'une ligne est cochée comme vérifiée dans l'onglet Pointages, elle disparaît automatiquement de la liste des anomalies du tableau de bord. Le manager n'a donc jamais besoin de faire défiler tout l'historique : le tableau de bord ne montre que ce qui reste à traiter.
 
 ## ⚠️ Avant utilisation — obligation légale (France)
 

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pointage à domicile</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 460px; margin: 30px auto; padding: 0 16px; text-align: center; color: #222; }
+  h1 { font-size: 20px; }
+  select, button { font-size: 18px; padding: 12px; margin: 8px 0; width: 100%; border-radius: 8px; box-sizing: border-box; }
+  select { border: 1px solid #ccc; }
+  button { color: white; border: none; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #arrivee { background: #2e7d32; }
+  #depart { background: #c62828; }
+
+  #statut { margin-top: 16px; font-size: 15px; min-height: 24px; padding: 10px; border-radius: 8px; }
+  #statut.ok { background: #e8f5e9; color: #1b5e20; }
+  #statut.warn { background: #fff8e1; color: #8d6e00; }
+  #statut.error { background: #ffebee; color: #b71c1c; }
+
+  #retry { display: none; background: #555; margin-top: 8px; }
+
+  .rgpd {
+    text-align: left; font-size: 12px; color: #555; background: #f4f4f4;
+    border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-top: 24px; line-height: 1.5;
+  }
+  .rgpd strong { color: #222; }
+
+  #credit { margin-top: 20px; font-size: 12px; color: #999; }
+  #credit a { color: #999; }
+</style>
+</head>
+<body>
+  <h1>Pointage à domicile</h1>
+
+  <!-- ⚠️ À remplacer après déploiement du backend Apps Script (voir README) -->
+  <script>
+    const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyn5VJegyygKf-nUPVColq6ibGWVHiZ2DRu2NVlUKckoD4IsXbd4zlOAjGcZclkCj5bmw/exec';
+  </script>
+
+  <select id="salariee">
+    <option>Salariée 1</option>
+    <option>Salariée 2</option>
+  </select>
+
+  <select id="client">
+    <option>Madame Sanchez</option>
+    <option>Monsieur CSOR</option>
+  </select>
+
+  <button id="arrivee" onclick="pointer('Arrivée')">✅ Pointer l'arrivée</button>
+  <button id="depart" onclick="pointer('Départ')">🚪 Pointer le départ</button>
+
+  <div id="statut"></div>
+  <button id="retry" onclick="reessayer()">🔄 Réessayer</button>
+
+  <div class="rgpd">
+    <strong>📋 Information RGPD / CNIL</strong><br>
+    Les données de géolocalisation et d'horodatage sont collectées <strong>uniquement au moment du pointage</strong>
+    (aucun suivi continu) dans le but exclusif de vérifier la présence effective aux horaires convenus dans le
+    cadre du contrat de travail CESU.<br><br>
+    <strong>Base légale :</strong> exécution du contrat de travail (art. 6.1.b RGPD).<br>
+    <strong>Destinataire des données :</strong> le particulier employeur.<br>
+    <strong>Durée de conservation :</strong> 5 ans (durée légale de conservation des documents de paie).<br>
+    <strong>Vos droits :</strong> accès, rectification et opposition sur les données vous concernant — contactez
+    votre employeur pour les exercer.
+  </div>
+
+  <div id="credit">
+    Application open source —
+    <a href="https://github.com/5136siegfried/cesu-pointage-geoloc" target="_blank">cesu-pointage-geoloc</a>
+    par <a href="https://github.com/5136siegfried" target="_blank">5136siegfried</a>
+  </div>
+
+  <script>
+    let dernierType = null;
+
+    function setBoutons(actifs) {
+      document.getElementById('arrivee').disabled = !actifs;
+      document.getElementById('depart').disabled = !actifs;
+    }
+    function afficherStatut(message, type) {
+      const el = document.getElementById('statut');
+      el.innerText = message;
+      el.className = type || '';
+    }
+    function afficherRetry(visible) {
+      document.getElementById('retry').style.display = visible ? 'block' : 'none';
+    }
+    function reessayer() {
+      if (dernierType) { afficherRetry(false); pointer(dernierType); }
+    }
+
+    function pointer(type) {
+      dernierType = type;
+      setBoutons(false);
+      afficherRetry(false);
+      afficherStatut('Localisation en cours...', '');
+
+      if (!navigator.geolocation) {
+        envoyer(type, null, null, null, 'Géolocalisation non supportée par ce navigateur');
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => envoyer(type, pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, null),
+        (err) => {
+          let raison;
+          switch (err.code) {
+            case err.PERMISSION_DENIED: raison = 'Localisation refusée ou désactivée sur le téléphone'; break;
+            case err.POSITION_UNAVAILABLE: raison = 'Position indisponible (signal GPS/réseau insuffisant)'; break;
+            case err.TIMEOUT: raison = 'La localisation a mis trop de temps à répondre'; break;
+            default: raison = 'Erreur de localisation inconnue';
+          }
+          envoyer(type, null, null, null, raison);
+        },
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    }
+
+    async function envoyer(type, lat, lng, precision, raisonEchecGeoloc) {
+      const salariee = document.getElementById('salariee').value;
+      const client = document.getElementById('client').value;
+
+      afficherStatut(
+        raisonEchecGeoloc
+          ? 'Position indisponible (' + raisonEchecGeoloc + '). Envoi du pointage sans position...'
+          : 'Envoi en cours...',
+        raisonEchecGeoloc ? 'warn' : ''
+      );
+
+      try {
+        // Content-Type text/plain volontaire : évite le préflight CORS (OPTIONS),
+        // qu'Apps Script ne sait pas gérer.
+        const response = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({ type, salariee, client, lat, lng, precision, raisonEchecGeoloc })
+        });
+        const res = await response.json();
+        setBoutons(true);
+
+        if (!res.ok) {
+          afficherStatut('❌ ' + res.error, 'error');
+          afficherRetry(true);
+          return;
+        }
+        const estOk = res.statut === 'OK';
+        afficherStatut(
+          type + ' enregistré pour ' + salariee + ' chez ' + client + '. Statut : ' + res.statut +
+          (res.distance !== null ? ' (' + res.distance + ' m du lieu)' : ''),
+          estOk ? 'ok' : 'warn'
+        );
+      } catch (err) {
+        setBoutons(true);
+        afficherStatut('❌ Échec de connexion. Le pointage n\'a peut-être pas été enregistré — vérifiez le tableau de bord avant de réessayer.', 'error');
+        afficherRetry(true);
+      }
+    }
+  </script>
+</body>
+</html>

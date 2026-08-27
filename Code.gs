@@ -1,5 +1,6 @@
 // ============ CONFIGURATION — à adapter avant utilisation ============
 const SHEET_NAME = 'Pointages';
+const DASHBOARD_SHEET_NAME = 'Tableau de bord';
 const RAYON_TOLERANCE_METRES = 150; // distance acceptée sans déclencher d'alerte
 
 // Un salarié peut intervenir chez plusieurs clients : chacun a ses propres coordonnées.
@@ -12,12 +13,36 @@ const SALARIEES = ['Salariée 1', 'Salariée 2']; // noms affichés dans le menu
 // =======================================================================
 
 function doGet() {
+  getSheet_();       // s'assure que l'onglet Pointages existe
+  ensureDashboard_(); // s'assure que le tableau de bord existe
+
   const template = HtmlService.createTemplateFromFile('Index');
   template.salariees = SALARIEES;
   template.clients = Object.keys(CLIENTS);
   return template.evaluate()
     .setTitle('Pointage à domicile')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// Point d'entrée utilisé par la page externe (GitHub Pages, docs/index.html).
+// Cette page tourne hors du sandbox iframe d'Apps Script : la géolocalisation
+// y fonctionne normalement sur iPhone/Safari, contrairement à la page Index.html
+// ci-dessus qui reste utilisable mais peut voir sa géoloc bloquée sur iOS.
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const result = enregistrerPointage(
+      data.type, data.salariee, data.client,
+      data.lat, data.lng, data.precision, data.raisonEchecGeoloc
+    );
+    return ContentService
+      .createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, error: 'Erreur serveur : ' + err.message }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
 
 function getSheet_() {
@@ -31,12 +56,62 @@ function getSheet_() {
       'Horodatage serveur', 'Type', 'Salariée', 'Client', 'Latitude', 'Longitude',
       'Précision (m)', 'Distance client (m)', 'Statut', 'Détail erreur', 'Vérifié par le manager'
     ]);
-    // Colonne "Vérifié par le manager" en case à cocher (colonne K), pour que
-    // l'employeur puisse valider chaque pointage directement dans le Sheet.
-    const rule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
-    sheet.getRange('K2:K').setDataValidation(rule);
+
+    // Colonne "Vérifié par le manager" en case à cocher (colonne K)
+    const ruleCheckbox = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+    sheet.getRange('K2:K').setDataValidation(ruleCheckbox);
+
+    // Mise en forme conditionnelle sur la colonne Statut (I) : rouge = à vérifier, vert = OK.
+    // Permet de repérer une anomalie d'un coup d'œil, sans avoir à lire chaque ligne.
+    const rangeStatut = sheet.getRange('I2:I');
+    const ruleAlerte = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextContains('VÉRIFIER')
+      .setBackground('#ffcdd2')
+      .setRanges([rangeStatut])
+      .build();
+    const ruleErreur = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextContains('ERREUR')
+      .setBackground('#ffcdd2')
+      .setRanges([rangeStatut])
+      .build();
+    const ruleOk = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo('OK')
+      .setBackground('#c8e6c9')
+      .setRanges([rangeStatut])
+      .build();
+    sheet.setConditionalFormatRules([ruleAlerte, ruleErreur, ruleOk]);
+
+    sheet.setFrozenRows(1);
   }
   return sheet;
+}
+
+// Crée un onglet "Tableau de bord" en première position, avec deux blocs qui se
+// mettent à jour tout seuls (formules QUERY) : les anomalies non traitées, et
+// les pointages les plus récents. Aucune action manuelle nécessaire.
+function ensureDashboard_() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  if (ss.getSheetByName(DASHBOARD_SHEET_NAME)) return; // déjà créé
+
+  const dash = ss.insertSheet(DASHBOARD_SHEET_NAME, 0);
+
+  dash.getRange('A1').setValue('🔴 À vérifier (non traité)').setFontWeight('bold').setFontSize(13);
+  dash.getRange('A2').setFormula(
+    '=IFERROR(QUERY(' + SHEET_NAME + '!A2:K,' +
+    '"select A,B,C,D,H,I,J where (I contains \'VÉRIFIER\' or I contains \'ERREUR\') and (K = false) order by A desc", 0),' +
+    '"Aucune anomalie en attente ✅")'
+  );
+
+  dash.getRange('J1').setValue('🕐 20 derniers pointages').setFontWeight('bold').setFontSize(13);
+  dash.getRange('J2').setFormula(
+    '=QUERY(' + SHEET_NAME + '!A2:K,' +
+    '"select A,B,C,D,H,I,J,K order by A desc limit 20", 0)'
+  );
+
+  dash.setFrozenRows(1);
+  dash.setColumnWidths(1, 17, 110);
+  ss.setActiveSheet(dash);
+  ss.moveActiveSheet(1);
 }
 
 // Fonction appelée depuis la page HTML (via google.script.run).
