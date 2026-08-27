@@ -29,45 +29,65 @@ function getSheet_() {
   if (sheet.getLastRow() === 0) {
     sheet.appendRow([
       'Horodatage serveur', 'Type', 'Salariée', 'Client', 'Latitude', 'Longitude',
-      'Précision (m)', 'Distance client (m)', 'Statut', 'Vérifié par le manager'
+      'Précision (m)', 'Distance client (m)', 'Statut', 'Détail erreur', 'Vérifié par le manager'
     ]);
-    // Colonne "Vérifié par le manager" en case à cocher, pour que l'employeur
-    // puisse valider chaque pointage directement dans le Sheet.
+    // Colonne "Vérifié par le manager" en case à cocher (colonne K), pour que
+    // l'employeur puisse valider chaque pointage directement dans le Sheet.
     const rule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
-    sheet.getRange('J2:J').setDataValidation(rule);
+    sheet.getRange('K2:K').setDataValidation(rule);
   }
   return sheet;
 }
 
-// Fonction appelée depuis la page HTML (via google.script.run)
-function enregistrerPointage(type, salariee, client, lat, lng, precision) {
-  const sheet = getSheet_();
-  const now = new Date(); // horodatage côté serveur : impossible à modifier depuis le téléphone
+// Fonction appelée depuis la page HTML (via google.script.run).
+// Ne lève jamais d'exception : toute erreur est renvoyée sous forme { ok: false, error }
+// pour que le client puisse afficher un message clair, sans jamais perdre la tentative de pointage.
+function enregistrerPointage(type, salariee, client, lat, lng, precision, raisonEchecGeoloc) {
+  try {
+    if (!type || !salariee || !client) {
+      return { ok: false, error: 'Champs manquants — merci de sélectionner salarié et client.' };
+    }
 
-  const ref = CLIENTS[client];
-  let distance = null;
-  let statut = 'Position non fournie';
+    const sheet = getSheet_();
+    const now = new Date(); // horodatage côté serveur : impossible à modifier depuis le téléphone
+    const ref = CLIENTS[client];
 
-  if (lat != null && lng != null && ref) {
-    distance = distanceMetres_(lat, lng, ref.lat, ref.lng);
-    statut = distance <= RAYON_TOLERANCE_METRES ? 'OK' : 'À VÉRIFIER — hors zone';
-  } else if (!ref) {
-    statut = 'Client inconnu';
+    let distance = null;
+    let statut;
+    let detail = '';
+
+    if (!ref) {
+      statut = 'ERREUR — client inconnu';
+      detail = 'Le client "' + client + '" n\'existe pas dans la configuration.';
+    } else if (lat != null && lng != null) {
+      distance = distanceMetres_(lat, lng, ref.lat, ref.lng);
+      statut = distance <= RAYON_TOLERANCE_METRES ? 'OK' : 'À VÉRIFIER — hors zone';
+    } else {
+      // La géolocalisation a échoué côté téléphone (refusée, désactivée, timeout...).
+      // Le pointage est quand même enregistré : il ne doit jamais être bloqué,
+      // mais le manager doit voir clairement qu'il n'y a pas eu de vérification GPS.
+      statut = 'À VÉRIFIER — position indisponible';
+      detail = raisonEchecGeoloc || 'Raison non précisée par le téléphone';
+    }
+
+    sheet.appendRow([
+      now, type, salariee, client,
+      lat || '', lng || '', precision || '',
+      distance !== null ? Math.round(distance) : '',
+      statut, detail,
+      false
+    ]);
+
+    return {
+      ok: true,
+      statut: statut,
+      distance: distance !== null ? Math.round(distance) : null
+    };
+
+  } catch (err) {
+    // Erreur inattendue côté serveur (Sheet verrouillé, quota dépassé, etc.)
+    return { ok: false, error: 'Erreur serveur : ' + err.message };
   }
-
-  sheet.appendRow([
-    now, type, salariee, client,
-    lat || '', lng || '', precision || '',
-    distance !== null ? Math.round(distance) : '',
-    statut,
-    false // case "Vérifié par le manager" non cochée par défaut
-  ]);
-
-  return {
-    ok: true,
-    statut: statut,
-    distance: distance !== null ? Math.round(distance) : null
-  };
 }
 
 function distanceMetres_(lat1, lng1, lat2, lng2) {

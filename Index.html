@@ -8,9 +8,16 @@
     select, button { font-size: 18px; padding: 12px; margin: 8px 0; width: 100%; border-radius: 8px; box-sizing: border-box; }
     select { border: 1px solid #ccc; }
     button { color: white; border: none; cursor: pointer; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
     #arrivee { background: #2e7d32; }
     #depart { background: #c62828; }
-    #statut { margin-top: 16px; font-size: 15px; min-height: 60px; }
+
+    #statut { margin-top: 16px; font-size: 15px; min-height: 24px; padding: 10px; border-radius: 8px; }
+    #statut.ok { background: #e8f5e9; color: #1b5e20; }
+    #statut.warn { background: #fff8e1; color: #8d6e00; }
+    #statut.error { background: #ffebee; color: #b71c1c; }
+
+    #retry { display: none; background: #555; margin-top: 8px; }
 
     .rgpd {
       text-align: left;
@@ -52,6 +59,7 @@
   <button id="depart" onclick="pointer('Départ')">🚪 Pointer le départ</button>
 
   <div id="statut"></div>
+  <button id="retry" onclick="reessayer()">🔄 Réessayer</button>
 
   <div class="rgpd">
     <strong>📋 Information RGPD / CNIL</strong><br>
@@ -72,36 +80,100 @@
   </div>
 
   <script>
+    let dernierType = null; // mémorise le dernier pointage tenté, pour permettre "Réessayer"
+
+    function setBoutons(actifs) {
+      document.getElementById('arrivee').disabled = !actifs;
+      document.getElementById('depart').disabled = !actifs;
+    }
+
+    function afficherStatut(message, type) {
+      const el = document.getElementById('statut');
+      el.innerText = message;
+      el.className = type || '';
+    }
+
+    function afficherRetry(visible) {
+      document.getElementById('retry').style.display = visible ? 'block' : 'none';
+    }
+
+    function reessayer() {
+      if (dernierType) {
+        afficherRetry(false);
+        pointer(dernierType);
+      }
+    }
+
     function pointer(type) {
-      const statut = document.getElementById('statut');
-      const salariee = document.getElementById('salariee').value;
-      const client = document.getElementById('client').value;
-      statut.innerText = 'Localisation en cours...';
+      dernierType = type;
+      setBoutons(false);
+      afficherRetry(false);
+      afficherStatut('Localisation en cours...', '');
 
       if (!navigator.geolocation) {
-        envoyer(type, salariee, client, null, null, null);
+        envoyer(type, null, null, null, 'Géolocalisation non supportée par ce navigateur');
         return;
       }
 
       navigator.geolocation.getCurrentPosition(
-        (pos) => envoyer(type, salariee, client, pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy),
-        () => envoyer(type, salariee, client, null, null, null),
+        (pos) => envoyer(type, pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, null),
+        (err) => {
+          let raison;
+          switch (err.code) {
+            case err.PERMISSION_DENIED:
+              raison = 'Localisation refusée ou désactivée sur le téléphone';
+              break;
+            case err.POSITION_UNAVAILABLE:
+              raison = 'Position indisponible (signal GPS/réseau insuffisant)';
+              break;
+            case err.TIMEOUT:
+              raison = 'La localisation a mis trop de temps à répondre';
+              break;
+            default:
+              raison = 'Erreur de localisation inconnue';
+          }
+          // On enregistre quand même le pointage : il ne doit jamais être bloqué
+          // par un problème de localisation, seulement signalé comme à vérifier.
+          envoyer(type, null, null, null, raison);
+        },
         { enableHighAccuracy: true, timeout: 10000 }
       );
     }
 
-    function envoyer(type, salariee, client, lat, lng, precision) {
-      document.getElementById('statut').innerText = 'Envoi en cours...';
+    function envoyer(type, lat, lng, precision, raisonEchecGeoloc) {
+      const salariee = document.getElementById('salariee').value;
+      const client = document.getElementById('client').value;
+
+      afficherStatut(
+        raisonEchecGeoloc
+          ? 'Position indisponible (' + raisonEchecGeoloc + '). Envoi du pointage sans position...'
+          : 'Envoi en cours...',
+        raisonEchecGeoloc ? 'warn' : ''
+      );
+
       google.script.run
         .withSuccessHandler(function(res) {
-          document.getElementById('statut').innerText =
+          setBoutons(true);
+          if (!res.ok) {
+            // Le serveur a répondu mais a refusé/échoué proprement (ex: client inconnu)
+            afficherStatut('❌ ' + res.error, 'error');
+            afficherRetry(true);
+            return;
+          }
+          const estOk = res.statut === 'OK';
+          afficherStatut(
             type + ' enregistré pour ' + salariee + ' chez ' + client + '. Statut : ' + res.statut +
-            (res.distance !== null ? ' (' + res.distance + ' m du lieu)' : '');
+            (res.distance !== null ? ' (' + res.distance + ' m du lieu)' : ''),
+            estOk ? 'ok' : 'warn'
+          );
         })
         .withFailureHandler(function(err) {
-          document.getElementById('statut').innerText = 'Erreur : ' + err.message;
+          // Échec de la communication elle-même (pas de réseau, script indisponible...)
+          setBoutons(true);
+          afficherStatut('❌ Échec de connexion : ' + err.message + '. Le pointage n\'a pas été enregistré.', 'error');
+          afficherRetry(true);
         })
-        .enregistrerPointage(type, salariee, client, lat, lng, precision);
+        .enregistrerPointage(type, salariee, client, lat, lng, precision, raisonEchecGeoloc);
     }
   </script>
 </body>

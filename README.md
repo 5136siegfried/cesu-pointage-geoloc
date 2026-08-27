@@ -27,6 +27,15 @@ Fonctionne entièrement sur **Google Apps Script + Google Sheets** : gratuit, au
 5. **Déployer > Nouveau déploiement > Application web** — exécuter en tant que "Moi", accès "Toute personne disposant du lien".
 6. Générer un QR code pointant vers l'URL de déploiement, l'imprimer et le poser sur site.
 
+## Gestion des erreurs
+
+Le pointage n'est **jamais bloqué**, quelle que soit l'erreur rencontrée :
+
+- **Localisation refusée, désactivée ou indisponible** → le pointage est quand même enregistré, avec le statut `À VÉRIFIER — position indisponible` et la raison précise dans la colonne "Détail erreur" (refus de permission, GPS indisponible, timeout...).
+- **Échec de connexion au serveur** (pas de réseau, script indisponible) → rien n'est enregistré, un message d'erreur clair s'affiche avec un bouton **Réessayer**.
+- **Erreur serveur inattendue** (Sheet verrouillé, quota dépassé...) → renvoyée proprement au client sans faire planter la page, avec bouton Réessayer.
+- Les boutons de pointage sont désactivés pendant l'envoi pour éviter les doubles clics.
+
 ## Vérification par le manager
 
 Chaque pointage crée une ligne dans l'onglet **Pointages** du Google Sheet, avec :
