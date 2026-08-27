@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Modifier un pointage — Pointage CESU</title>
+<style>
+  body { font-family: Arial, sans-serif; margin: 24px; color: #222; max-width: 500px; }
+  nav { margin-bottom: 20px; font-size: 14px; }
+  nav a { margin-right: 14px; color: #2e7d32; text-decoration: none; }
+  label { display: block; margin-top: 12px; font-size: 14px; }
+  input, select { font-size: 14px; padding: 6px; width: 100%; box-sizing: border-box; margin-top: 4px; }
+  button { padding: 8px 16px; border: none; border-radius: 4px; background: #2e7d32; color: white; cursor: pointer; margin-top: 16px; }
+  .lecture-seule { background: #f4f4f4; border: 1px solid #ddd; border-radius: 8px; padding: 10px; font-size: 13px; color: #555; margin-top: 20px; }
+</style>
+</head>
+<body>
+<nav><a href="/admin">← Retour au tableau de bord</a></nav>
+
+<h1>Modifier le pointage #{{ p.id }}</h1>
+<p style="font-size:13px;color:#777;">Correction manuelle — à réserver aux erreurs avérées (oubli de pointage, bug). Cette modification écrase la valeur d'origine sans conserver d'historique.</p>
+
+<form method="post" action="/admin/pointage/{{ p.id }}/edit">
+  <label>Horodatage <input name="horodatage" type="datetime-local" step="1" value="{{ p.horodatage }}" required></label>
+  <label>Type
+    <select name="type" required>
+      <option value="Arrivée" {{ "selected" if p.type == "Arrivée" else "" }}>Arrivée</option>
+      <option value="Départ" {{ "selected" if p.type == "Départ" else "" }}>Départ</option>
+    </select>
+  </label>
+  <label>Salariée
+    <select name="salariee" required>
+      {% for e in employes %}<option value="{{ e.nom }}" {{ "selected" if e.nom == p.salariee else "" }}>{{ e.nom }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Client
+    <select name="client" required>
+      {% for c in clients %}<option value="{{ c }}" {{ "selected" if c == p.client else "" }}>{{ c }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Statut <input name="statut" value="{{ p.statut }}" required></label>
+  <label>Détail <input name="detail" value="{{ p.detail or '' }}"></label>
+  <label><input type="checkbox" name="verifie" style="width:auto;display:inline" {{ "checked" if p.verifie else "" }}> Vérifié par le manager</label>
+  <button type="submit">💾 Enregistrer la correction</button>
+</form>
+
+<div class="lecture-seule">
+  <strong>Données GPS d'origine (lecture seule)</strong><br>
+  Latitude : {{ p.lat or "—" }} · Longitude : {{ p.lng or "—" }} · Précision : {{ p.precision or "—" }} m · Distance calculée : {{ p.distance or "—" }} m
+</div>
+</body>
+</html>

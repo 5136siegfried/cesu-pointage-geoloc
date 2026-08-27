@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pointage à domicile</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2e7d32">
+<style>
+  body { font-family: Arial, sans-serif; max-width: 460px; margin: 30px auto; padding: 0 16px; text-align: center; color: #222; }
+  h1 { font-size: 20px; }
+  select, button { font-size: 18px; padding: 12px; margin: 8px 0; width: 100%; border-radius: 8px; box-sizing: border-box; }
+  select { border: 1px solid #ccc; }
+  button { color: white; border: none; cursor: pointer; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #arrivee { background: #2e7d32; }
+  #depart { background: #c62828; }
+  #statut { margin-top: 16px; font-size: 15px; min-height: 24px; padding: 10px; border-radius: 8px; }
+  #statut.ok { background: #e8f5e9; color: #1b5e20; }
+  #statut.warn { background: #fff8e1; color: #8d6e00; }
+  #statut.error { background: #ffebee; color: #b71c1c; }
+  #retry { display: none; background: #555; margin-top: 8px; }
+  #enattente { display: none; background: #fff3e0; color: #8d6e00; border: 1px solid #ffb300; border-radius: 8px; padding: 10px; margin-top: 12px; font-size: 13px; }
+
+  .consignes-bloc {
+    margin-top: 16px;
+    padding: 14px;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-align: left;
+  }
+  .consignes-bloc h2 { font-size: 15px; margin: 0 0 8px 0; }
+  #consignes-texte { white-space: pre-wrap; font-size: 14px; line-height: 1.5; color: #333; }
+  .rgpd { text-align: left; font-size: 12px; color: #555; background: #f4f4f4; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-top: 24px; line-height: 1.5; }
+  .rgpd strong { color: #222; }
+  #credit { margin-top: 20px; font-size: 12px; color: #999; }
+  #credit a { color: #999; }
+</style>
+</head>
+<body>
+  <h1>Pointage à domicile</h1>
+
+  <div id="bandeau" style="display:none; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; text-align:left;"></div>
+
+  <select id="salariee"><option>Chargement...</option></select>
+  <select id="client"><option>Chargement...</option></select>
+
+  <button id="arrivee" onclick="pointer('Arrivée')">✅ Pointer l'arrivée</button>
+  <button id="depart" onclick="pointer('Départ')">🚪 Pointer le départ</button>
+
+  <div id="statut"></div>
+  <button id="retry" onclick="reessayer()">🔄 Réessayer</button>
+  <div id="enattente"></div>
+
+  <div class="consignes-bloc">
+    <h2>📋 Consignes</h2>
+    <div id="consignes-texte">Chargement...</div>
+  </div>
+
+  <div class="rgpd">
+    <strong>📋 Information RGPD / CNIL</strong><br>
+    Les données de géolocalisation et d'horodatage sont collectées <strong>uniquement au moment du pointage</strong>
+    (aucun suivi continu) dans le but exclusif de vérifier la présence effective aux horaires convenus dans le
+    cadre du contrat de travail CESU.<br><br>
+    <strong>Base légale :</strong> exécution du contrat de travail (art. 6.1.b RGPD).<br>
+    <strong>Destinataire des données :</strong> le particulier employeur, sur son propre serveur (aucun tiers).<br>
+    <strong>Durée de conservation :</strong> 5 ans (durée légale de conservation des documents de paie).<br>
+    <strong>Vos droits :</strong> accès, rectification et opposition — contactez votre employeur pour les exercer.
+  </div>
+
+  <div id="credit">
+    Application open source —
+    <a href="https://github.com/5136siegfried/cesu-pointage-geoloc" target="_blank">cesu-pointage-geoloc</a>
+    par <a href="https://github.com/5136siegfried" target="_blank">5136siegfried</a>
+  </div>
+
+<script>
+  let dernierType = null;
+  const CLE_ATTENTE = 'pointages_en_attente';
+
+  function setBoutons(actifs) {
+    document.getElementById('arrivee').disabled = !actifs;
+    document.getElementById('depart').disabled = !actifs;
+  }
+  function afficherStatut(message, type) {
+    const el = document.getElementById('statut');
+    el.innerText = message;
+    el.className = type || '';
+  }
+  function afficherRetry(visible) {
+    document.getElementById('retry').style.display = visible ? 'block' : 'none';
+  }
+
+  // --- File d'attente locale (coupure réseau) ---
+  function lireAttente() { return JSON.parse(localStorage.getItem(CLE_ATTENTE) || '[]'); }
+  function ecrireAttente(liste) { localStorage.setItem(CLE_ATTENTE, JSON.stringify(liste)); }
+  function ajouterAttente(payload) {
+    const liste = lireAttente();
+    liste.push(payload);
+    ecrireAttente(liste);
+    majAffichageAttente();
+  }
+  function majAffichageAttente() {
+    const liste = lireAttente();
+    const el = document.getElementById('enattente');
+    if (liste.length === 0) { el.style.display = 'none'; return; }
+    el.style.display = 'block';
+    el.innerText = '⏳ ' + liste.length + ' pointage(s) en attente d\'envoi (pas de réseau au moment du clic). Nouvel essai automatique dès que la connexion revient.';
+  }
+  async function viderAttente() {
+    const liste = lireAttente();
+    if (liste.length === 0) return;
+    const restants = [];
+    for (const payload of liste) {
+      try {
+        const r = await fetch('/api/pointage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+      } catch (e) {
+        restants.push(payload); // toujours pas de réseau, on garde pour plus tard
+      }
+    }
+    ecrireAttente(restants);
+    majAffichageAttente();
+  }
+  window.addEventListener('online', viderAttente);
+  document.addEventListener('DOMContentLoaded', () => { majAffichageAttente(); viderAttente(); });
+
+  // --- Chargement de la config (salariées / clients) ---
+  async function chargerConfig() {
+    const res = await fetch('/api/config');
+    const cfg = await res.json();
+    const selSal = document.getElementById('salariee');
+    const selCli = document.getElementById('client');
+    selSal.innerHTML = cfg.salariees.map(s => `<option>${s}</option>`).join('');
+    selCli.innerHTML = cfg.clients.map(c => `<option>${c}</option>`).join('');
+  }
+  chargerConfig();
+
+  // --- Bandeau d'alerte piloté depuis /admin/bandeau ---
+  async function chargerBandeau() {
+    try {
+      const res = await fetch('/api/bandeau');
+      const b = await res.json();
+      const el = document.getElementById('bandeau');
+      if (b.actif && b.message) {
+        el.innerText = (b.type === 'alerte' ? '⚠️ ' : 'ℹ️ ') + b.message;
+        el.style.background = b.type === 'alerte' ? '#ffebee' : '#e3f2fd';
+        el.style.color = b.type === 'alerte' ? '#b71c1c' : '#0d47a1';
+        el.style.display = 'block';
+      }
+    } catch (e) { /* pas bloquant si ça échoue */ }
+  }
+  chargerBandeau();
+
+  function reessayer() {
+    if (dernierType) { afficherRetry(false); pointer(dernierType); }
+  }
+
+  function pointer(type) {
+    dernierType = type;
+    setBoutons(false);
+    afficherRetry(false);
+    afficherStatut('Localisation en cours...', '');
+
+    if (!navigator.geolocation) {
+      envoyer(type, null, null, null, 'Géolocalisation non supportée par ce navigateur');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => envoyer(type, pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy, null),
+      (err) => {
+        let raison;
+        switch (err.code) {
+          case err.PERMISSION_DENIED: raison = 'Localisation refusée ou désactivée sur le téléphone'; break;
+          case err.POSITION_UNAVAILABLE: raison = 'Position indisponible (signal GPS/réseau insuffisant)'; break;
+          case err.TIMEOUT: raison = 'La localisation a mis trop de temps à répondre'; break;
+          default: raison = 'Erreur de localisation inconnue';
+        }
+        envoyer(type, null, null, null, raison);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  async function envoyer(type, lat, lng, precision, raisonEchecGeoloc) {
+    const salariee = document.getElementById('salariee').value;
+    const client = document.getElementById('client').value;
+    const payload = { type, salariee, client, lat, lng, precision, raisonEchecGeoloc };
+
+    afficherStatut(
+      raisonEchecGeoloc ? 'Position indisponible (' + raisonEchecGeoloc + '). Envoi du pointage sans position...' : 'Envoi en cours...',
+      raisonEchecGeoloc ? 'warn' : ''
+    );
+
+    try {
+      const response = await fetch('/api/pointage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const res = await response.json();
+      setBoutons(true);
+
+      if (!res.ok) {
+        afficherStatut('❌ ' + res.error, 'error');
+        afficherRetry(true);
+        return;
+      }
+      const estOk = res.statut === 'OK';
+      afficherStatut(
+        type + ' enregistré pour ' + salariee + ' chez ' + client + '. Statut : ' + res.statut +
+        (res.distance !== null ? ' (' + res.distance + ' m du lieu)' : ''),
+        estOk ? 'ok' : 'warn'
+      );
+    } catch (err) {
+      // Pas de réseau : on met en file d'attente locale plutôt que de perdre le pointage.
+      setBoutons(true);
+      ajouterAttente(payload);
+      afficherStatut('📴 Pas de réseau. Le pointage est enregistré localement et sera envoyé automatiquement dès que la connexion revient.', 'warn');
+    }
+  }
+
+  // --- Consignes affichées directement sur la page ---
+  async function chargerConsignes() {
+    const el = document.getElementById('consignes-texte');
+    try {
+      const res = await fetch('/api/consignes');
+      const data = await res.json();
+      el.innerText = data.texte || 'Aucune consigne pour le moment.';
+    } catch (e) {
+      el.innerText = 'Impossible de charger les consignes pour le moment.';
+    }
+  }
+  chargerConsignes();
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js');
+  }
+</script>
+</body>
+</html>
