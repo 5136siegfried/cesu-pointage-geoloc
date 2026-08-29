@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from selfhosted.db import get_pointages, get_employes
+from db import get_pointages, get_employes
 
 
 def calculer_heures_couts(mois: str):

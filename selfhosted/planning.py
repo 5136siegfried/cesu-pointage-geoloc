@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from selfhosted.db import get_planning, get_pointages
+from db import get_planning, get_pointages
 
 JOURS = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"]
 
