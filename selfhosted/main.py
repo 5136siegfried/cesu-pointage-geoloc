@@ -8,8 +8,8 @@ from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, Stre
 from fastapi.templating import Jinja2Templates
 from openpyxl import Workbook
 
-from config import RAYON_TOLERANCE_METRES, VERSION
-from db import (
+from selfhosted.config import RAYON_TOLERANCE_METRES, VERSION
+from selfhosted.db import (
     init_db, insert_pointage, get_pointages, set_verifie,
     get_pointage, update_pointage,
     get_employes, get_employe, add_employe, update_employe, delete_employe,
@@ -17,8 +17,8 @@ from db import (
     get_kv, set_kv,
     get_planning, get_planning_item, add_planning, update_planning, delete_planning
 )
-from calcul import calculer_heures_couts
-from planning import planning_vs_reel_semaine, JOURS
+from selfhosted.calcul import calculer_heures_couts
+from selfhosted.planning import planning_vs_reel_semaine, JOURS
 
 app = FastAPI(title="cesu-pointage-geoloc")
 app.mount("/static", StaticFiles(directory="static"), name="static")
