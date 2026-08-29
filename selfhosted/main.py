@@ -158,9 +158,13 @@ async def verifier(pointage_id: int):
 
 @app.get("/admin/pointage/{pid}", response_class=HTMLResponse)
 async def fiche_pointage(request: Request, pid: int):
+    p = get_pointage(pid)
+    client_ref = get_client_by_nom(p["client"]) if p else None
     return templates.TemplateResponse("pointage_detail.html", {
         "request": request,
-        "p": get_pointage(pid),
+        "p": p,
+        "client_ref": client_ref,
+        "rayon_tolerance": RAYON_TOLERANCE_METRES,
         "employes": get_employes(),  # tous, y compris inactifs, au cas où le pointage les référence
         "clients": [c["nom"] for c in get_clients()]  # tous, y compris inactifs
     })

@@ -52,3 +52,44 @@ async function rechercherAdresse(mapDivId, latInputId, lngInputId, query) {
     alert("Recherche d'adresse indisponible pour le moment — pointe directement sur la carte.");
   }
 }
+
+// Carte en lecture seule pour vérifier un pointage : position capturée (📍) vs
+// position attendue du client (🏠), avec le rayon de tolérance pour visualiser l'écart.
+function initMapVerif(mapDivId, pointageLat, pointageLng, clientLat, clientLng, rayonTolerance) {
+  const map = L.map(mapDivId, { zoomControl: true, dragging: true, scrollWheelZoom: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+
+  const points = [];
+
+  if (clientLat != null && clientLng != null) {
+    L.marker([clientLat, clientLng], {
+      icon: L.divIcon({ html: '🏠', className: 'icone-carte', iconSize: [26, 26] })
+    }).addTo(map).bindPopup('Position attendue (client)');
+    points.push([clientLat, clientLng]);
+
+    if (rayonTolerance) {
+      L.circle([clientLat, clientLng], {
+        radius: rayonTolerance, color: '#2e7d32', weight: 1, fillOpacity: 0.07
+      }).addTo(map);
+    }
+  }
+
+  if (pointageLat != null && pointageLng != null) {
+    L.marker([pointageLat, pointageLng], {
+      icon: L.divIcon({ html: '📍', className: 'icone-carte', iconSize: [26, 26] })
+    }).addTo(map).bindPopup('Position du pointage');
+    points.push([pointageLat, pointageLng]);
+  }
+
+  if (points.length === 2) {
+    L.polyline(points, { color: '#c62828', weight: 2, dashArray: '5,5' }).addTo(map);
+    map.fitBounds(points, { padding: [40, 40] });
+  } else if (points.length === 1) {
+    map.setView(points[0], 15);
+  } else {
+    map.setView([44.8378, -0.5792], 12);
+  }
+}

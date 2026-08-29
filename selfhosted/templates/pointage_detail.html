@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Modifier un pointage — Pointage CESU</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <link rel="stylesheet" href="/static/admin.css">
+<style>.icone-carte { font-size: 22px; text-align: center; line-height: 26px; }</style>
 </head>
 <body>
 <a href="/admin" class="retour">← Retour au tableau de bord</a>
@@ -39,8 +41,28 @@
 </div>
 
 <div class="carte" style="font-size:13px;color:var(--texte-clair, #666);">
-  <strong style="color:#222;">Données GPS d'origine (lecture seule)</strong><br>
-  Latitude : {{ p.lat or "—" }} · Longitude : {{ p.lng or "—" }} · Précision : {{ p.precision or "—" }} m · Distance calculée : {{ p.distance or "—" }} m
+  <strong style="color:#222;">Position enregistrée</strong>
+  <div id="map" style="height:300px;margin-top:10px;border-radius:10px;overflow:hidden;"></div>
+  <p style="margin-top:10px;">
+    📍 Pointage : {{ p.lat or "—" }}, {{ p.lng or "—" }} (précision {{ p.precision or "—" }} m)<br>
+    🏠 Client attendu : {{ client_ref.lat if client_ref else "—" }}, {{ client_ref.lng if client_ref else "—" }}<br>
+    Distance calculée : {{ p.distance or "—" }} m (tolérance : {{ rayon_tolerance }} m)
+  </p>
 </div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/map-picker.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    initMapVerif(
+      'map',
+      {{ p.lat if p.lat is not none else 'null' }},
+      {{ p.lng if p.lng is not none else 'null' }},
+      {{ client_ref.lat if client_ref else 'null' }},
+      {{ client_ref.lng if client_ref else 'null' }},
+      {{ rayon_tolerance }}
+    );
+  });
+</script>
 </body>
 </html>
