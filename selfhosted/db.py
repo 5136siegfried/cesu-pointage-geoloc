@@ -165,6 +165,16 @@ def get_pointage(pid):
     return row
 
 
+def get_dernier_pointage(salariee, client):
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT * FROM pointages WHERE salariee = ? AND client = ? ORDER BY horodatage DESC LIMIT 1",
+        (salariee, client)
+    ).fetchone()
+    conn.close()
+    return row
+
+
 def update_pointage(pid, horodatage, type_, salariee, client, statut, detail, verifie):
     conn = get_conn()
     conn.execute(

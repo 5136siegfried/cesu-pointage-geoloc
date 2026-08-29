@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentation — Pointage CESU</title>
+<link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+<nav class="admin-nav">
+  <a href="/admin">📊 Tableau de bord</a>
+  <a href="/admin/employes">👥 Employés</a>
+  <a href="/admin/clients">🏠 Clients</a>
+  <a href="/admin/planning">🗓 Planning</a>
+  <a href="/admin/bandeau">📢 Bandeau d'alerte</a>
+  <a href="/admin/doc" class="actif">📖 Doc</a>
+  <a href="/admin/changelog">📝 Changelog</a>
+</nav>
+
+<h1>Documentation</h1>
+
+<div class="carte">
+  <h2 style="margin-top:0;">Tableau de bord</h2>
+  <p>Vue d'ensemble : heures et coût par salariée sur une période (sélecteur de mois), anomalies non traitées à vérifier, 20 derniers pointages. Un lien ✏️ permet de corriger manuellement un pointage en cas d'erreur avérée. L'export Excel télécharge un résumé + le détail complet du mois sélectionné.</p>
+</div>
+
+<div class="carte">
+  <h2 style="margin-top:0;">Employés</h2>
+  <p>Fiche par salariée : taux horaire (utilisé pour le calcul du coût), et les informations utiles à la déclaration CESU (téléphone, numéro de sécurité sociale, date de naissance, adresse). Une salariée inactive disparaît du menu de pointage mais son historique reste intact.</p>
+</div>
+
+<div class="carte">
+  <h2 style="margin-top:0;">Clients</h2>
+  <p>Fiche par client (lieu d'intervention) : coordonnées GPS posées sur une carte interactive (clic ou recherche d'adresse), conditions médicales, contact à prévenir, et consignes propres à ce client — visibles par les salariées sur la page de pointage dès qu'elles sélectionnent ce client. Un client inactif disparaît du menu mais son historique reste intact.</p>
+</div>
+
+<div class="carte">
+  <h2 style="margin-top:0;">Planning</h2>
+  <p>Créneaux récurrents (salariée + client + jour de semaine + horaire). Le haut de la page compare automatiquement, pour la semaine en cours, chaque créneau prévu à la présence effective d'un pointage — utile pour distinguer une absence prévue d'un oubli de pointage.</p>
+</div>
+
+<div class="carte">
+  <h2 style="margin-top:0;">Bandeau d'alerte</h2>
+  <p>Message affiché en haut de la page de pointage, visible par toutes les salariées. Utile pour prévenir d'un changement ponctuel (absence, horaire modifié...).</p>
+</div>
+
+<div class="carte">
+  <h2 style="margin-top:0;">Fiabilité des pointages</h2>
+  <p>L'horodatage est capturé côté serveur (non modifiable depuis le téléphone). La distance entre la position captée et le client sélectionné est calculée automatiquement ; un écart trop important, une géolocalisation refusée, ou une séquence Arrivée/Départ incohérente sont signalés comme anomalies dans le tableau de bord — jamais bloqués, toujours enregistrés pour vérification.</p>
+</div>
+
+<div class="carte">
+  <h2 style="margin-top:0;">Sécurité et sauvegarde</h2>
+  <p>L'accès à <code>/admin</code> est protégé par Basic Auth au niveau du reverse proxy (nginx) — aucun identifiant n'est codé dans l'application. Toutes les données vivent dans un unique fichier SQLite, sauvegardé quotidiennement via <code>backup.sh</code> (voir le README du dépôt pour la mise en place).</p>
+</div>
+</body>
+</html>

@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Changelog — Pointage CESU</title>
+<link rel="stylesheet" href="/static/admin.css">
+<style>
+  pre { white-space: pre-wrap; font-family: inherit; font-size: 13px; line-height: 1.7; margin: 0; }
+</style>
+</head>
+<body>
+<nav class="admin-nav">
+  <a href="/admin">📊 Tableau de bord</a>
+  <a href="/admin/employes">👥 Employés</a>
+  <a href="/admin/clients">🏠 Clients</a>
+  <a href="/admin/planning">🗓 Planning</a>
+  <a href="/admin/bandeau">📢 Bandeau d'alerte</a>
+  <a href="/admin/doc">📖 Doc</a>
+  <a href="/admin/changelog" class="actif">📝 Changelog</a>
+</nav>
+
+<h1>Changelog</h1>
+<p>Version actuellement déployée : <strong>{{ version }}</strong></p>
+
+<div class="carte">
+  <pre>{{ contenu }}</pre>
+</div>
+</body>
+</html>

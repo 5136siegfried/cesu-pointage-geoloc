@@ -1,7 +1,7 @@
 // Network-first pour le HTML (toujours la version la plus fraîche),
 // cache-first pour le reste. Le cache ne sert de secours qu'hors-ligne.
 
-const CACHE_NAME = 'cesu-pointage-v4';
+const CACHE_NAME = 'cesu-pointage-v7';
 const APP_SHELL = ['/static/index.html', '/static/manifest.json'];
 
 self.addEventListener('install', (event) => {

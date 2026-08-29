@@ -41,6 +41,24 @@
     box-sizing: border-box;
     font-family: inherit;
   }
+  .champ-label {
+    display: block;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    color: #3a3a3c;
+    margin: 14px 0 2px 2px;
+  }
+  #recap {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: #eef6ef;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1b5e20;
+    text-align: left;
+  }
   select { border: 1px solid #dcdce0; background: #fafafa; }
   button { color: white; border: none; cursor: pointer; font-weight: 500; }
   button:hover { opacity: 0.92; }
@@ -68,6 +86,19 @@
   .rgpd strong { color: #3a3a3c; }
   #credit { margin-top: 18px; font-size: 11.5px; color: #b0b0b3; }
   #credit a { color: #b0b0b3; }
+
+  .tuto {
+    margin-top: 18px;
+    padding: 14px 16px;
+    background: #f7f7f8;
+    border-radius: 12px;
+    text-align: left;
+    font-size: 13px;
+    color: #3a3a3c;
+  }
+  .tuto summary { font-weight: 600; cursor: pointer; list-style: none; }
+  .tuto summary::-webkit-details-marker { display: none; }
+  .tuto p { margin: 10px 0 0 0; color: #3a3a3c; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -77,8 +108,13 @@
 
   <div id="bandeau" style="display:none; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; text-align:left;"></div>
 
+  <label class="champ-label" for="salariee">👤 Salariée</label>
   <select id="salariee"><option>Chargement...</option></select>
+
+  <label class="champ-label" for="client">🏠 Client</label>
   <select id="client"><option>Chargement...</option></select>
+
+  <div id="recap"></div>
 
   <button id="arrivee" onclick="pointer('Arrivée')">✅ Pointer l'arrivée</button>
   <button id="depart" onclick="pointer('Départ')">🚪 Pointer le départ</button>
@@ -102,6 +138,13 @@
     <strong>Durée de conservation :</strong> 5 ans (durée légale de conservation des documents de paie).<br>
     <strong>Vos droits :</strong> accès, rectification et opposition — contactez votre employeur pour les exercer.
   </div>
+
+  <details class="tuto">
+    <summary>📲 Première utilisation ? Installer l'application</summary>
+    <p><strong>Sur iPhone (Safari) :</strong> appuyez sur l'icône de partage <span style="font-size:16px;">⬆️</span> en bas de l'écran, puis « Sur l'écran d'accueil ». L'application s'ouvrira ensuite en plein écran, comme une app normale.</p>
+    <p><strong>Sur Android (Chrome) :</strong> appuyez sur le menu <span style="font-size:16px;">⋮</span> en haut à droite, puis « Ajouter à l'écran d'accueil » (ou « Installer l'application » selon les téléphones).</p>
+    <p>Une fois installée, la géolocalisation ne sera demandée qu'une seule fois — pensez à autoriser la position quand le téléphone le propose.</p>
+  </details>
 
   <div id="credit">
     Application open source —
@@ -176,6 +219,12 @@
   chargerVersion();
 
   // --- Chargement de la config (salariées / clients) ---
+  function majRecap() {
+    const salariee = document.getElementById('salariee').value;
+    const client = document.getElementById('client').value;
+    document.getElementById('recap').innerText = `👉 Vous pointez pour ${salariee}, chez ${client}`;
+  }
+
   async function chargerConfig() {
     const res = await fetch('/api/config');
     const cfg = await res.json();
@@ -183,7 +232,10 @@
     const selCli = document.getElementById('client');
     selSal.innerHTML = cfg.salariees.map(s => `<option>${s}</option>`).join('');
     selCli.innerHTML = cfg.clients.map(c => `<option>${c}</option>`).join('');
+    selSal.addEventListener('change', majRecap);
     selCli.addEventListener('change', chargerConsignes);
+    selCli.addEventListener('change', majRecap);
+    majRecap();
     chargerConsignes(); // affichage initial pour le premier client sélectionné
   }
   chargerConfig();
@@ -205,10 +257,40 @@
   chargerBandeau();
 
   function reessayer() {
-    if (dernierType) { afficherRetry(false); pointer(dernierType); }
+    if (dernierType) { afficherRetry(false); lancerPointage(dernierType); }
   }
 
-  function pointer(type) {
+  // --- Vérification en amont de l'alternance Arrivée/Départ pour ce binôme ---
+  async function typeAttendu() {
+    const salariee = document.getElementById('salariee').value;
+    const client = document.getElementById('client').value;
+    try {
+      const res = await fetch('/api/dernier-type?salariee=' + encodeURIComponent(salariee) + '&client=' + encodeURIComponent(client));
+      const d = await res.json();
+      return d.dernier_type; // "Arrivée", "Départ" ou null (aucun pointage antérieur)
+    } catch (e) {
+      return undefined; // indéterminé — on ne bloque ni n'avertit dans ce cas
+    }
+  }
+
+  async function pointer(type) {
+    const salariee = document.getElementById('salariee').value;
+    const client = document.getElementById('client').value;
+    const dernier = await typeAttendu();
+
+    if (dernier !== undefined) {
+      if (type === 'Arrivée' && dernier === 'Arrivée') {
+        if (!confirm(`${salariee} chez ${client} : le dernier pointage était déjà une arrivée sans départ enregistré. Confirmer quand même cette nouvelle arrivée ?`)) return;
+      }
+      if (type === 'Départ' && dernier !== 'Arrivée') {
+        if (!confirm(`${salariee} chez ${client} : aucune arrivée enregistrée juste avant. Confirmer quand même ce départ ?`)) return;
+      }
+    }
+
+    lancerPointage(type);
+  }
+
+  function lancerPointage(type) {
     dernierType = type;
     setBoutons(false);
     afficherRetry(false);

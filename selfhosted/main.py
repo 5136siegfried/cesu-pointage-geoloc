@@ -1,6 +1,7 @@
 import io
 from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
+from pathlib import Path
 
 from fastapi import FastAPI, Request, Form
 from fastapi.staticfiles import StaticFiles
@@ -11,7 +12,7 @@ from openpyxl import Workbook
 from config import RAYON_TOLERANCE_METRES, VERSION
 from db import (
     init_db, insert_pointage, get_pointages, set_verifie,
-    get_pointage, update_pointage,
+    get_pointage, get_dernier_pointage, update_pointage,
     get_employes, get_employe, add_employe, update_employe, delete_employe,
     get_clients, get_client, get_client_by_nom, add_client, update_client, delete_client,
     get_kv, set_kv,
@@ -90,6 +91,12 @@ async def consignes_publiques(request: Request, client: str = None):
     return templates.TemplateResponse("consignes_public.html", {"request": request, "c": c})
 
 
+@app.get("/api/dernier-type")
+async def dernier_type_api(salariee: str, client: str):
+    dernier = get_dernier_pointage(salariee, client)
+    return {"dernier_type": dernier["type"] if dernier else None}
+
+
 @app.post("/api/pointage")
 async def pointage(request: Request):
     try:
@@ -118,6 +125,19 @@ async def pointage(request: Request):
         else:
             statut = "À VÉRIFIER — position indisponible"
             detail = raison or "Raison non précisée par le téléphone"
+
+        # Vérifie que ce pointage suit bien une alternance Arrivée/Départ pour ce
+        # binôme salariée/client — sinon signalé, jamais bloqué.
+        dernier = get_dernier_pointage(salariee, client)
+        sequence_ok = (
+            (type_ == "Arrivée" and (not dernier or dernier["type"] == "Départ"))
+            or (type_ == "Départ" and dernier and dernier["type"] == "Arrivée")
+        )
+        if not sequence_ok:
+            if statut == "OK":
+                statut = "À VÉRIFIER — séquence incohérente"
+            note = f"Pointage précédent pour ce binôme : {dernier['type'] if dernier else 'aucun'}."
+            detail = f"{detail} / {note}" if detail else note
 
         insert_pointage(
             horodatage=datetime.now().isoformat(timespec="seconds"),
@@ -356,6 +376,21 @@ async def modifier_client(
 async def supprimer_client(cid: int):
     delete_client(cid)
     return RedirectResponse("/admin/clients", status_code=303)
+
+
+@app.get("/admin/doc", response_class=HTMLResponse)
+async def doc_admin(request: Request):
+    return templates.TemplateResponse("doc.html", {"request": request})
+
+
+@app.get("/admin/changelog", response_class=HTMLResponse)
+async def changelog_admin(request: Request):
+    chemin = Path(__file__).parent / "CHANGELOG.md"
+    try:
+        contenu = chemin.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        contenu = "Changelog introuvable."
+    return templates.TemplateResponse("changelog.html", {"request": request, "contenu": contenu, "version": VERSION})
 
 
 # ============ Admin — bandeau d'alerte ============
