@@ -8,20 +8,4 @@ services:
     environment:
       - TZ=Europe/Paris
     ports:
-      - "18000:8000"   # port hôte changé pour éviter une collision avec les règles iptables de kube-proxy
-    # Décommente si tu utilises déjà Traefik comme reverse proxy sur ton VPS
-    # labels:
-    #   - "traefik.enable=true"
-    #   - "traefik.http.routers.cesu-pointage.rule=Host(`pointage.tondomaine.fr`)"
-    #   - "traefik.http.routers.cesu-pointage.tls.certresolver=letsencrypt"
-    #   - "traefik.http.services.cesu-pointage.loadbalancer.server.port=8000"
-    #   # Protège /admin par Basic Auth au niveau du reverse proxy (rien à coder dans l'app)
-    #   - "traefik.http.routers.cesu-pointage-admin.rule=Host(`pointage.tondomaine.fr`) && PathPrefix(`/admin`)"
-    #   - "traefik.http.routers.cesu-pointage-admin.middlewares=cesu-admin-auth"
-    #   - "traefik.http.middlewares.cesu-admin-auth.basicauth.users=manager:$$apr1$$REMPLACER_PAR_UN_HASH_HTPASSWD"
-    # networks:
-    #   - traefik
-
-# networks:
-#   traefik:
-#     external: true
+      - "127.0.0.1:8000:8000"   # lié en local uniquement : nginx fait le reverse proxy + TLS (certbot)

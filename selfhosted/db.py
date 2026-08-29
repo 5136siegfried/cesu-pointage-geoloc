@@ -5,6 +5,16 @@ DB_PATH = Path("data/pointages.db")
 DB_PATH.parent.mkdir(exist_ok=True, parents=True)
 
 
+def _colonne_existe(conn, table, colonne):
+    cols = [row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+    return colonne in cols
+
+
+def _ajouter_colonne_si_absente(conn, table, colonne, definition):
+    if not _colonne_existe(conn, table, colonne):
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {colonne} {definition}")
+
+
 def get_conn():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -42,6 +52,30 @@ def init_db():
     """)
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS clients (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nom TEXT NOT NULL UNIQUE,
+            lat REAL NOT NULL,
+            lng REAL NOT NULL,
+            actif INTEGER DEFAULT 1,
+            notes TEXT
+        )
+    """)
+
+    # Champs utiles pour la déclaration CESU (cesu.urssaf.fr)
+    _ajouter_colonne_si_absente(conn, "employes", "telephone", "TEXT")
+    _ajouter_colonne_si_absente(conn, "employes", "numero_secu", "TEXT")
+    _ajouter_colonne_si_absente(conn, "employes", "date_naissance", "TEXT")
+    _ajouter_colonne_si_absente(conn, "employes", "adresse", "TEXT")
+
+    # Migration idempotente, sans danger sur une base existante.
+    _ajouter_colonne_si_absente(conn, "clients", "prenom", "TEXT")
+    _ajouter_colonne_si_absente(conn, "clients", "conditions_medicales", "TEXT")
+    _ajouter_colonne_si_absente(conn, "clients", "contact_urgence_nom", "TEXT")
+    _ajouter_colonne_si_absente(conn, "clients", "contact_urgence_telephone", "TEXT")
+    _ajouter_colonne_si_absente(conn, "clients", "consignes", "TEXT")
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS config_kv (
             cle TEXT PRIMARY KEY,
             valeur TEXT
@@ -60,13 +94,22 @@ def init_db():
         )
     """)
 
-    # Seed initial : si aucun employé n'existe encore, on en crée deux par défaut
-    # (reprend les anciens noms génériques de config.py) pour ne pas partir d'un
-    # menu de pointage vide au premier lancement.
+    # Seed par défaut si la table est vide.
     count = conn.execute("SELECT COUNT(*) AS c FROM employes").fetchone()["c"]
     if count == 0:
         conn.execute("INSERT INTO employes (nom, taux_horaire, actif) VALUES (?, 0, 1)", ("Salariée 1",))
         conn.execute("INSERT INTO employes (nom, taux_horaire, actif) VALUES (?, 0, 1)", ("Salariée 2",))
+
+    count_clients = conn.execute("SELECT COUNT(*) AS c FROM clients").fetchone()["c"]
+    if count_clients == 0:
+        conn.execute(
+            "INSERT INTO clients (nom, lat, lng, actif) VALUES (?, ?, ?, 1)",
+            ("Madame Sanchez", 44.844812194736136, -0.6290475221000387)
+        )
+        conn.execute(
+            "INSERT INTO clients (nom, lat, lng, actif) VALUES (?, ?, ?, 1)",
+            ("Monsieur CSOR", 44.82652723012038, -0.5740482204182619)
+        )
 
     conn.commit()
     conn.close()
@@ -153,21 +196,23 @@ def get_employe(emp_id):
     return row
 
 
-def add_employe(nom, taux_horaire, notes=""):
+def add_employe(nom, taux_horaire, telephone="", numero_secu="", date_naissance="", adresse="", notes=""):
     conn = get_conn()
     conn.execute(
-        "INSERT INTO employes (nom, taux_horaire, actif, notes) VALUES (?, ?, 1, ?)",
-        (nom, taux_horaire, notes)
+        """INSERT INTO employes (nom, taux_horaire, actif, telephone, numero_secu, date_naissance, adresse, notes)
+           VALUES (?, ?, 1, ?, ?, ?, ?, ?)""",
+        (nom, taux_horaire, telephone, numero_secu, date_naissance, adresse, notes)
     )
     conn.commit()
     conn.close()
 
 
-def update_employe(emp_id, nom, taux_horaire, notes, actif):
+def update_employe(emp_id, nom, taux_horaire, telephone, numero_secu, date_naissance, adresse, notes, actif):
     conn = get_conn()
     conn.execute(
-        "UPDATE employes SET nom = ?, taux_horaire = ?, notes = ?, actif = ? WHERE id = ?",
-        (nom, taux_horaire, notes, 1 if actif else 0, emp_id)
+        """UPDATE employes SET nom=?, taux_horaire=?, telephone=?, numero_secu=?, date_naissance=?,
+           adresse=?, notes=?, actif=? WHERE id=?""",
+        (nom, taux_horaire, telephone, numero_secu, date_naissance, adresse, notes, 1 if actif else 0, emp_id)
     )
     conn.commit()
     conn.close()
@@ -176,6 +221,69 @@ def update_employe(emp_id, nom, taux_horaire, notes, actif):
 def delete_employe(emp_id):
     conn = get_conn()
     conn.execute("DELETE FROM employes WHERE id = ?", (emp_id,))
+    conn.commit()
+    conn.close()
+
+
+# ---------- Clients (sites) ----------
+
+def get_clients(only_actifs=False):
+    conn = get_conn()
+    q = "SELECT * FROM clients"
+    if only_actifs:
+        q += " WHERE actif = 1"
+    q += " ORDER BY nom"
+    rows = conn.execute(q).fetchall()
+    conn.close()
+    return rows
+
+
+def get_client(cid):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM clients WHERE id = ?", (cid,)).fetchone()
+    conn.close()
+    return row
+
+
+def get_client_by_nom(nom):
+    conn = get_conn()
+    row = conn.execute("SELECT * FROM clients WHERE nom = ?", (nom,)).fetchone()
+    conn.close()
+    return row
+
+
+def add_client(nom, lat, lng, prenom="", conditions_medicales="", contact_urgence_nom="",
+                contact_urgence_telephone="", consignes="", notes=""):
+    conn = get_conn()
+    conn.execute(
+        """INSERT INTO clients
+           (nom, prenom, lat, lng, actif, conditions_medicales, contact_urgence_nom,
+            contact_urgence_telephone, consignes, notes)
+           VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)""",
+        (nom, prenom, lat, lng, conditions_medicales, contact_urgence_nom,
+         contact_urgence_telephone, consignes, notes)
+    )
+    conn.commit()
+    conn.close()
+
+
+def update_client(cid, nom, lat, lng, prenom, conditions_medicales, contact_urgence_nom,
+                   contact_urgence_telephone, consignes, notes, actif):
+    conn = get_conn()
+    conn.execute(
+        """UPDATE clients SET nom=?, prenom=?, lat=?, lng=?, conditions_medicales=?,
+           contact_urgence_nom=?, contact_urgence_telephone=?, consignes=?, notes=?, actif=?
+           WHERE id=?""",
+        (nom, prenom, lat, lng, conditions_medicales, contact_urgence_nom,
+         contact_urgence_telephone, consignes, notes, 1 if actif else 0, cid)
+    )
+    conn.commit()
+    conn.close()
+
+
+def delete_client(cid):
+    conn = get_conn()
+    conn.execute("DELETE FROM clients WHERE id = ?", (cid,))
     conn.commit()
     conn.close()
 

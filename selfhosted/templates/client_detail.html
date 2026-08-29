@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modifier {{ c.nom }} — Pointage CESU</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+<a href="/admin/clients" class="retour">← Retour à la liste</a>
+
+<h1>Modifier — {{ c.nom }}</h1>
+
+<div class="carte">
+  <form method="post" action="/admin/clients/{{ c.id }}/edit">
+    <h2 style="margin-top:0;">Identité</h2>
+    <div class="grille">
+      <label>Nom <input name="nom" value="{{ c.nom }}" required></label>
+      <label>Prénom <input name="prenom" value="{{ c.prenom or '' }}"></label>
+    </div>
+
+    <h2>Localisation</h2>
+    <div class="recherche">
+      <input type="text" id="recherche-adresse" placeholder="Chercher une adresse...">
+      <button type="button" class="btn-petit btn-secondaire" onclick="rechercherAdresse('map','lat','lng', document.getElementById('recherche-adresse').value)">🔍</button>
+    </div>
+    <div id="map"></div>
+    <div class="grille">
+      <label>Latitude <input id="lat" name="lat" type="number" step="any" value="{{ c.lat }}" required></label>
+      <label>Longitude <input id="lng" name="lng" type="number" step="any" value="{{ c.lng }}" required></label>
+    </div>
+
+    <h2>Santé et sécurité</h2>
+    <label>Conditions médicales <textarea name="conditions_medicales" rows="3">{{ c.conditions_medicales or '' }}</textarea></label>
+    <div class="grille">
+      <label>Contact à prévenir — nom <input name="contact_urgence_nom" value="{{ c.contact_urgence_nom or '' }}"></label>
+      <label>Contact à prévenir — téléphone <input name="contact_urgence_telephone" value="{{ c.contact_urgence_telephone or '' }}"></label>
+    </div>
+
+    <h2>Consignes pour les salariées</h2>
+    <p class="aide">Visible par les salariées sur la page de pointage dès que ce client est sélectionné.</p>
+    <label><textarea name="consignes" rows="8">{{ c.consignes or '' }}</textarea></label>
+
+    <h2>Autres notes</h2>
+    <label>Notes internes (non visibles des salariées) <input name="notes" value="{{ c.notes or '' }}"></label>
+    <label><input type="checkbox" name="actif" {{ "checked" if c.actif else "" }}> Actif (apparaît dans le menu de pointage)</label>
+
+    <button type="submit">💾 Enregistrer</button>
+  </form>
+</div>
+
+<div class="carte">
+  <form method="post" action="/admin/clients/{{ c.id }}/supprimer" onsubmit="return confirm('Supprimer définitivement ce client ? Les pointages déjà enregistrés sous ce nom ne seront pas supprimés.');">
+    <button type="submit" class="btn-delete">🗑 Supprimer le client</button>
+  </form>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/map-picker.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    initMapPicker('map', 'lat', 'lng', {{ c.lat }}, {{ c.lng }});
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Clients — Pointage CESU</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+<nav class="admin-nav">
+  <a href="/admin">📊 Tableau de bord</a>
+  <a href="/admin/employes">👥 Employés</a>
+  <a href="/admin/clients" class="actif">🏠 Clients</a>
+  <a href="/admin/planning">🗓 Planning</a>
+  <a href="/admin/bandeau">📢 Bandeau d'alerte</a>
+</nav>
+
+<h1>Clients</h1>
+
+<div class="carte">
+  <h2 style="margin-top:0;">Ajouter un client</h2>
+  <form method="post" action="/admin/clients">
+    <div class="grille">
+      <label>Nom <input name="nom" required></label>
+      <label>Prénom <input name="prenom"></label>
+    </div>
+
+    <label style="margin-top:16px;">Localisation</label>
+    <div class="recherche">
+      <input type="text" id="recherche-adresse" placeholder="Chercher une adresse...">
+      <button type="button" class="btn-petit btn-secondaire" onclick="rechercherAdresse('map-ajout','lat','lng', document.getElementById('recherche-adresse').value)">🔍</button>
+    </div>
+    <div id="map-ajout"></div>
+    <div class="grille">
+      <label>Latitude <input id="lat" name="lat" type="number" step="any" required></label>
+      <label>Longitude <input id="lng" name="lng" type="number" step="any" required></label>
+    </div>
+
+    <label>Conditions médicales <textarea name="conditions_medicales" rows="2"></textarea></label>
+    <div class="grille">
+      <label>Contact à prévenir — nom <input name="contact_urgence_nom"></label>
+      <label>Contact à prévenir — téléphone <input name="contact_urgence_telephone"></label>
+    </div>
+    <label>Consignes pour les salariées <textarea name="consignes" rows="3"></textarea></label>
+    <label>Notes internes <input name="notes"></label>
+
+    <button type="submit">Ajouter</button>
+  </form>
+</div>
+
+<div class="carte">
+  <h2 style="margin-top:0;">Liste</h2>
+  <div class="table-scroll">
+    <table>
+      <tr><th>Nom</th><th>Prénom</th><th>Coordonnées</th><th>Actif</th><th></th></tr>
+      {% for c in clients %}
+      <tr>
+        <td>{{ c.nom }}</td>
+        <td>{{ c.prenom or "" }}</td>
+        <td>{{ c.lat }}, {{ c.lng }}</td>
+        <td>{{ "Oui" if c.actif else "Non" }}</td>
+        <td><a href="/admin/clients/{{ c.id }}">Modifier</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/static/map-picker.js"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    initMapPicker('map-ajout', 'lat', 'lng', null, null);
+  });
+</script>
+</body>
+</html>

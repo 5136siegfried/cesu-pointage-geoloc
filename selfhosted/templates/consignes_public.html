@@ -3,15 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Consignes</title>
+<title>Consignes{{ " — " + c.nom if c else "" }}</title>
 <style>
   body { font-family: Arial, sans-serif; max-width: 500px; margin: 30px auto; padding: 0 16px; color: #222; line-height: 1.6; }
   h1 { font-size: 20px; }
-  .texte { white-space: pre-wrap; background: #f8f8f8; border: 1px solid #eee; border-radius: 8px; padding: 16px; margin-top: 16px; }
+  .bloc { background: #f8f8f8; border: 1px solid #eee; border-radius: 8px; padding: 14px; margin-top: 14px; }
+  .bloc strong { display: block; margin-bottom: 6px; }
+  .texte { white-space: pre-wrap; }
 </style>
 </head>
 <body>
-  <h1>📋 Consignes</h1>
-  <div class="texte">{{ texte }}</div>
+  <h1>📋 Consignes{{ " — " + c.nom if c else "" }}</h1>
+  {% if c %}
+    {% if c.conditions_medicales %}
+    <div class="bloc"><strong>⚕️ Conditions médicales</strong><span class="texte">{{ c.conditions_medicales }}</span></div>
+    {% endif %}
+    {% if c.contact_urgence_nom or c.contact_urgence_telephone %}
+    <div class="bloc"><strong>📞 Contact à prévenir</strong>{{ c.contact_urgence_nom or "" }} {{ c.contact_urgence_telephone or "" }}</div>
+    {% endif %}
+    <div class="bloc"><strong>Consignes</strong><span class="texte">{{ c.consignes or "Aucune consigne particulière." }}</span></div>
+  {% else %}
+    <p>Sélectionnez un client depuis la page de pointage.</p>
+  {% endif %}
 </body>
 </html>

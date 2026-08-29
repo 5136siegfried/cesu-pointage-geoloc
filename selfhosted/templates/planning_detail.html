@@ -2,47 +2,39 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Modifier un créneau — Pointage CESU</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 24px; color: #222; max-width: 500px; }
-  nav { margin-bottom: 20px; font-size: 14px; }
-  nav a { margin-right: 14px; color: #2e7d32; text-decoration: none; }
-  label { display: block; margin-top: 12px; font-size: 14px; }
-  input, select { font-size: 14px; padding: 6px; width: 100%; box-sizing: border-box; margin-top: 4px; }
-  button { padding: 8px 16px; border: none; border-radius: 4px; color: white; cursor: pointer; margin-top: 16px; }
-  .btn-save { background: #2e7d32; }
-  .btn-delete { background: #c62828; }
-</style>
+<link rel="stylesheet" href="/static/admin.css">
 </head>
 <body>
-<nav><a href="/admin/planning">← Retour au planning</a></nav>
+<a href="/admin/planning" class="retour">← Retour au planning</a>
 
 <h1>Modifier le créneau</h1>
 
-<form method="post" action="/admin/planning/{{ p.id }}/edit">
-  <label>Salariée
-    <select name="employe" required>
-      {% for e in employes %}<option value="{{ e.nom }}" {{ "selected" if e.nom == p.employe else "" }}>{{ e.nom }}</option>{% endfor %}
-    </select>
-  </label>
-  <label>Client
-    <select name="client" required>
-      {% for c in clients %}<option value="{{ c }}" {{ "selected" if c == p.client else "" }}>{{ c }}</option>{% endfor %}
-    </select>
-  </label>
-  <label>Jour
-    <select name="jour_semaine" required>
-      {% for i in range(7) %}<option value="{{ i }}" {{ "selected" if i == p.jour_semaine else "" }}>{{ jours[i] }}</option>{% endfor %}
-    </select>
-  </label>
-  <label>Début <input name="heure_debut" type="time" value="{{ p.heure_debut }}" required></label>
-  <label>Fin <input name="heure_fin" type="time" value="{{ p.heure_fin }}" required></label>
-  <label>Notes <input name="notes" value="{{ p.notes or '' }}"></label>
-  <button type="submit" class="btn-save">💾 Enregistrer</button>
-</form>
+<div class="carte">
+  <form method="post" action="/admin/planning/{{ p.id }}/edit">
+    <label>Salariée
+      <select name="employe" required>{% for e in employes %}<option value="{{ e.nom }}" {{ "selected" if e.nom == p.employe else "" }}>{{ e.nom }}</option>{% endfor %}</select>
+    </label>
+    <label>Client
+      <select name="client" required>{% for c in clients %}<option value="{{ c }}" {{ "selected" if c == p.client else "" }}>{{ c }}</option>{% endfor %}</select>
+    </label>
+    <label>Jour
+      <select name="jour_semaine" required>{% for i in range(7) %}<option value="{{ i }}" {{ "selected" if i == p.jour_semaine else "" }}>{{ jours[i] }}</option>{% endfor %}</select>
+    </label>
+    <div class="grille">
+      <label>Début <input name="heure_debut" type="time" value="{{ p.heure_debut }}" required></label>
+      <label>Fin <input name="heure_fin" type="time" value="{{ p.heure_fin }}" required></label>
+    </div>
+    <label>Notes <input name="notes" value="{{ p.notes or '' }}"></label>
+    <button type="submit">💾 Enregistrer</button>
+  </form>
+</div>
 
-<form method="post" action="/admin/planning/{{ p.id }}/supprimer" onsubmit="return confirm('Supprimer ce créneau récurrent ?');">
-  <button type="submit" class="btn-delete">🗑 Supprimer</button>
-</form>
+<div class="carte">
+  <form method="post" action="/admin/planning/{{ p.id }}/supprimer" onsubmit="return confirm('Supprimer ce créneau récurrent ?');">
+    <button type="submit" class="btn-delete">🗑 Supprimer</button>
+  </form>
+</div>
 </body>
 </html>

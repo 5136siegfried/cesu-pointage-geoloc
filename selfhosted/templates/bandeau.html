@@ -2,39 +2,34 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Bandeau d'alerte — Pointage CESU</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 24px; color: #222; max-width: 500px; }
-  nav { margin-bottom: 20px; font-size: 14px; }
-  nav a { margin-right: 14px; color: #2e7d32; text-decoration: none; }
-  label { display: block; margin-top: 14px; font-size: 14px; }
-  input[type=text], select { font-size: 14px; padding: 6px; width: 100%; box-sizing: border-box; margin-top: 4px; }
-  button { padding: 8px 16px; border: none; border-radius: 4px; background: #2e7d32; color: white; cursor: pointer; margin-top: 16px; }
-  .apercu { margin-top: 20px; padding: 10px; border-radius: 8px; font-size: 14px; }
-</style>
+<link rel="stylesheet" href="/static/admin.css">
 </head>
 <body>
-<nav>
+<nav class="admin-nav">
   <a href="/admin">📊 Tableau de bord</a>
   <a href="/admin/employes">👥 Employés</a>
+  <a href="/admin/clients">🏠 Clients</a>
   <a href="/admin/planning">🗓 Planning</a>
-  <a href="/admin/consignes">📋 Consignes</a>
-  <a href="/admin/bandeau">📢 Bandeau d'alerte</a>
+  <a href="/admin/bandeau" class="actif">📢 Bandeau d'alerte</a>
 </nav>
 
 <h1>Bandeau d'alerte</h1>
-<p style="font-size:13px;color:#666;">Affiché en haut de la page de pointage, visible par toutes les salariées. Utile pour prévenir d'une absence, d'un changement d'horaire, d'une consigne ponctuelle...</p>
 
-<form method="post" action="/admin/bandeau">
-  <label><input type="checkbox" name="actif" style="width:auto;display:inline" {{ "checked" if actif else "" }}> Afficher le bandeau</label>
-  <label>Type
-    <select name="type">
-      <option value="info" {{ "selected" if type == "info" else "" }}>Info (bleu)</option>
-      <option value="alerte" {{ "selected" if type == "alerte" else "" }}>Alerte (rouge)</option>
-    </select>
-  </label>
-  <label>Message <input type="text" name="message" value="{{ message }}"></label>
-  <button type="submit">💾 Enregistrer</button>
-</form>
+<div class="carte">
+  <p>Affiché en haut de la page de pointage, visible par toutes les salariées. Utile pour prévenir d'une absence, d'un changement d'horaire, d'une consigne ponctuelle...</p>
+  <form method="post" action="/admin/bandeau">
+    <label><input type="checkbox" name="actif" {{ "checked" if actif else "" }}> Afficher le bandeau</label>
+    <label>Type
+      <select name="type">
+        <option value="info" {{ "selected" if type == "info" else "" }}>Info (bleu)</option>
+        <option value="alerte" {{ "selected" if type == "alerte" else "" }}>Alerte (rouge)</option>
+      </select>
+    </label>
+    <label>Message <input type="text" name="message" value="{{ message }}"></label>
+    <button type="submit">💾 Enregistrer</button>
+  </form>
+</div>
 </body>
 </html>

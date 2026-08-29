@@ -2,84 +2,81 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tableau de bord — Pointage CESU</title>
-<style>
-  body { font-family: Arial, sans-serif; margin: 24px; color: #222; max-width: 900px; }
-  h1 { font-size: 20px; }
-  h2 { font-size: 16px; margin-top: 32px; }
-  nav { margin-bottom: 20px; font-size: 14px; }
-  nav a { margin-right: 14px; color: #2e7d32; text-decoration: none; }
-  nav a:hover { text-decoration: underline; }
-  table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
-  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
-  th { background: #f4f4f4; }
-  tr.alerte { background: #ffebee; }
-  tr.ok { background: #e8f5e9; }
-  button { padding: 4px 10px; border: none; border-radius: 4px; background: #2e7d32; color: white; cursor: pointer; }
-  .vide { color: #777; font-style: italic; }
-  input[type=month] { font-size: 14px; padding: 4px; }
-</style>
+<link rel="stylesheet" href="/static/admin.css">
 </head>
 <body>
-<nav>
-  <a href="/admin">📊 Tableau de bord</a>
+<nav class="admin-nav">
+  <a href="/admin" class="actif">📊 Tableau de bord</a>
   <a href="/admin/employes">👥 Employés</a>
+  <a href="/admin/clients">🏠 Clients</a>
   <a href="/admin/planning">🗓 Planning</a>
-  <a href="/admin/consignes">📋 Consignes</a>
   <a href="/admin/bandeau">📢 Bandeau d'alerte</a>
-  <a href="/consignes" target="_blank">👁 Voir la page consignes</a>
 </nav>
 
-<h1>Tableau de bord — Pointage CESU</h1>
+<h1>Tableau de bord</h1>
 
-<h2>💶 Heures et coût — {{ mois }}</h2>
-<form method="get" action="/admin">
-  <input type="month" name="mois" value="{{ mois }}" onchange="this.form.submit()">
-</form>
-<table>
-  <tr><th>Salariée</th><th>Heures</th><th>Taux horaire</th><th>Coût</th><th>Pointages incomplets</th></tr>
-  {% for r in resume %}
-  <tr>
-    <td>{{ r.salariee }}</td>
-    <td>{{ r.heures }} h</td>
-    <td>{{ (r.taux_horaire ~ " €/h") if r.taux_horaire else "non défini" }}</td>
-    <td>{{ (r.cout ~ " €") if r.cout is not none else "—" }}</td>
-    <td>{{ r.pointages_incomplets if r.pointages_incomplets else "" }}</td>
-  </tr>
-  {% endfor %}
-  <tr><td><strong>Total</strong></td><td></td><td></td><td><strong>{{ total_cout }} €</strong></td><td></td></tr>
-</table>
-<p><a href="/admin/export.xlsx?mois={{ mois }}">⬇ Télécharger en Excel (résumé + détail)</a></p>
+<div class="carte">
+  <h2 style="margin-top:0;">💶 Heures et coût — {{ mois }}</h2>
+  <form method="get" action="/admin">
+    <input type="month" name="mois" value="{{ mois }}" onchange="this.form.submit()" style="max-width:200px;">
+  </form>
+  <div class="table-scroll">
+    <table>
+      <tr><th>Salariée</th><th>Heures</th><th>Taux horaire</th><th>Coût</th><th>Incomplets</th></tr>
+      {% for r in resume %}
+      <tr>
+        <td>{{ r.salariee }}</td>
+        <td>{{ r.heures }} h</td>
+        <td>{{ (r.taux_horaire ~ " €/h") if r.taux_horaire else "non défini" }}</td>
+        <td>{{ (r.cout ~ " €") if r.cout is not none else "—" }}</td>
+        <td>{{ r.pointages_incomplets if r.pointages_incomplets else "" }}</td>
+      </tr>
+      {% endfor %}
+      <tr><td><strong>Total</strong></td><td></td><td></td><td><strong>{{ total_cout }} €</strong></td><td></td></tr>
+    </table>
+  </div>
+  <p style="margin-top:12px;"><a href="/admin/export.xlsx?mois={{ mois }}">⬇ Télécharger en Excel (résumé + détail)</a></p>
+</div>
 
-<h2>🔴 À vérifier (non traité)</h2>
-{% if anomalies %}
-<table>
-  <tr><th>Horodatage</th><th>Type</th><th>Salariée</th><th>Client</th><th>Distance (m)</th><th>Statut</th><th>Détail</th><th></th></tr>
-  {% for p in anomalies %}
-  <tr class="alerte">
-    <td>{{ p.horodatage }}</td><td>{{ p.type }}</td><td>{{ p.salariee }}</td><td>{{ p.client }}</td>
-    <td>{{ p.distance or "" }}</td><td>{{ p.statut }}</td><td>{{ p.detail }}</td>
-    <td>
-      <form method="post" action="/admin/verifier/{{ p.id }}" style="display:inline"><button type="submit">✔ Vérifié</button></form>
-      <a href="/admin/pointage/{{ p.id }}">✏️ Modifier</a>
-    </td>
-  </tr>
-  {% endfor %}
-</table>
-{% else %}
-<p class="vide">Aucune anomalie en attente ✅</p>
-{% endif %}
+<div class="carte">
+  <h2 style="margin-top:0;">🔴 À vérifier (non traité)</h2>
+  {% if anomalies %}
+  <div class="table-scroll">
+    <table>
+      <tr><th>Horodatage</th><th>Type</th><th>Salariée</th><th>Client</th><th>Distance</th><th>Statut</th><th>Détail</th><th></th></tr>
+      {% for p in anomalies %}
+      <tr class="alerte">
+        <td>{{ p.horodatage }}</td><td>{{ p.type }}</td><td>{{ p.salariee }}</td><td>{{ p.client }}</td>
+        <td>{{ p.distance or "" }}</td><td>{{ p.statut }}</td><td>{{ p.detail }}</td>
+        <td style="white-space:nowrap;">
+          <form method="post" action="/admin/verifier/{{ p.id }}" style="display:inline"><button type="submit" class="btn-petit">✔ Vérifié</button></form>
+          <a href="/admin/pointage/{{ p.id }}">✏️</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p class="vide">Aucune anomalie en attente ✅</p>
+  {% endif %}
+</div>
 
-<h2>🕐 20 derniers pointages</h2>
-<table>
-  <tr><th>Horodatage</th><th>Type</th><th>Salariée</th><th>Client</th><th>Distance (m)</th><th>Statut</th><th>Vérifié</th><th></th></tr>
-  {% for p in recents %}
-  <tr class="{{ 'ok' if p.statut == 'OK' else 'alerte' if 'VÉRIFIER' in p.statut or 'ERREUR' in p.statut else '' }}">
-    <td>{{ p.horodatage }}</td><td>{{ p.type }}</td><td>{{ p.salariee }}</td><td>{{ p.client }}</td>
-    <td>{{ p.distance or "" }}</td><td>{{ p.statut }}</td><td>{{ "✔" if p.verifie else "" }}</td>
-    <td><a href="/admin/pointage/{{ p.id }}">✏️</a></td>
-  </tr>
-  {% endfor %}
-</table>
+<div class="carte">
+  <h2 style="margin-top:0;">🕐 20 derniers pointages</h2>
+  <div class="table-scroll">
+    <table>
+      <tr><th>Horodatage</th><th>Type</th><th>Salariée</th><th>Client</th><th>Distance</th><th>Statut</th><th>Vérifié</th><th></th></tr>
+      {% for p in recents %}
+      <tr class="{{ 'ok' if p.statut == 'OK' else 'alerte' if 'VÉRIFIER' in p.statut or 'ERREUR' in p.statut else '' }}">
+        <td>{{ p.horodatage }}</td><td>{{ p.type }}</td><td>{{ p.salariee }}</td><td>{{ p.client }}</td>
+        <td>{{ p.distance or "" }}</td><td>{{ p.statut }}</td><td>{{ "✔" if p.verifie else "" }}</td>
+        <td><a href="/admin/pointage/{{ p.id }}">✏️</a></td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+</div>
 </body>
 </html>

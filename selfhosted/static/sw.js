@@ -1,9 +1,7 @@
-// Service worker : cache l'app shell pour un chargement rapide, mais privilégie
-// toujours le réseau pour la page HTML elle-même (network-first), afin qu'une
-// mise à jour du code soit visible immédiatement plutôt que servie depuis un
-// cache périmé. Le cache ne sert de secours qu'en cas de coupure réseau.
+// Network-first pour le HTML (toujours la version la plus fraîche),
+// cache-first pour le reste. Le cache ne sert de secours qu'hors-ligne.
 
-const CACHE_NAME = 'cesu-pointage-v2'; // incrémenter à chaque mise à jour notable du front
+const CACHE_NAME = 'cesu-pointage-v4';
 const APP_SHELL = ['/static/index.html', '/static/manifest.json'];
 
 self.addEventListener('install', (event) => {

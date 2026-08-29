@@ -7,38 +7,72 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2e7d32">
 <style>
-  body { font-family: Arial, sans-serif; max-width: 460px; margin: 30px auto; padding: 0 16px; text-align: center; color: #222; }
-  h1 { font-size: 20px; }
-  select, button { font-size: 18px; padding: 12px; margin: 8px 0; width: 100%; border-radius: 8px; box-sizing: border-box; }
-  select { border: 1px solid #ccc; }
-  button { color: white; border: none; cursor: pointer; }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    background: #f2f4f3;
+    margin: 0;
+    padding: 24px 16px;
+    color: #1c1c1e;
+  }
+  .conteneur {
+    max-width: 440px;
+    margin: 0 auto;
+    background: white;
+    border-radius: 18px;
+    padding: 28px 22px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    text-align: center;
+  }
+  #version-badge {
+    text-align: center;
+    font-size: 11px;
+    color: #999;
+    margin-bottom: 10px;
+    letter-spacing: 0.02em;
+  }
+  h1 { font-size: 21px; margin: 0 0 18px 0; font-weight: 600; }
+  select, button {
+    font-size: 16px;
+    padding: 13px;
+    margin: 7px 0;
+    width: 100%;
+    border-radius: 10px;
+    box-sizing: border-box;
+    font-family: inherit;
+  }
+  select { border: 1px solid #dcdce0; background: #fafafa; }
+  button { color: white; border: none; cursor: pointer; font-weight: 500; }
+  button:hover { opacity: 0.92; }
+  button:disabled { opacity: 0.45; cursor: not-allowed; }
   #arrivee { background: #2e7d32; }
   #depart { background: #c62828; }
-  #statut { margin-top: 16px; font-size: 15px; min-height: 24px; padding: 10px; border-radius: 8px; }
+  #statut { margin-top: 16px; font-size: 14px; min-height: 22px; padding: 12px; border-radius: 10px; }
   #statut.ok { background: #e8f5e9; color: #1b5e20; }
   #statut.warn { background: #fff8e1; color: #8d6e00; }
   #statut.error { background: #ffebee; color: #b71c1c; }
-  #retry { display: none; background: #555; margin-top: 8px; }
-  #enattente { display: none; background: #fff3e0; color: #8d6e00; border: 1px solid #ffb300; border-radius: 8px; padding: 10px; margin-top: 12px; font-size: 13px; }
+  #retry { display: none; background: #6b6b70; margin-top: 8px; }
+  #enattente { display: none; background: #fff3e0; color: #8d6e00; border: 1px solid #ffb300; border-radius: 10px; padding: 10px; margin-top: 12px; font-size: 13px; }
 
   .consignes-bloc {
-    margin-top: 16px;
-    padding: 14px;
-    background: #f0f0f0;
-    border: 1px solid #ddd;
-    border-radius: 8px;
+    margin-top: 18px;
+    padding: 16px;
+    background: #f7f7f8;
+    border-radius: 12px;
     text-align: left;
   }
-  .consignes-bloc h2 { font-size: 15px; margin: 0 0 8px 0; }
-  #consignes-texte { white-space: pre-wrap; font-size: 14px; line-height: 1.5; color: #333; }
-  .rgpd { text-align: left; font-size: 12px; color: #555; background: #f4f4f4; border: 1px solid #ddd; border-radius: 8px; padding: 12px; margin-top: 24px; line-height: 1.5; }
-  .rgpd strong { color: #222; }
-  #credit { margin-top: 20px; font-size: 12px; color: #999; }
-  #credit a { color: #999; }
+  .consignes-bloc h2 { font-size: 14px; margin: 0 0 8px 0; font-weight: 600; }
+  #consignes-texte { white-space: pre-wrap; font-size: 13.5px; line-height: 1.55; color: #3a3a3c; }
+  #consignes-texte p { margin: 0 0 8px 0; }
+  .rgpd { text-align: left; font-size: 11.5px; color: #6b6b70; background: #f7f7f8; border-radius: 12px; padding: 14px; margin-top: 20px; line-height: 1.5; }
+  .rgpd strong { color: #3a3a3c; }
+  #credit { margin-top: 18px; font-size: 11.5px; color: #b0b0b3; }
+  #credit a { color: #b0b0b3; }
 </style>
 </head>
 <body>
+<div class="conteneur">
+  <div id="version-badge"></div>
   <h1>Pointage à domicile</h1>
 
   <div id="bandeau" style="display:none; padding:10px; border-radius:8px; margin-bottom:14px; font-size:14px; text-align:left;"></div>
@@ -74,6 +108,7 @@
     <a href="https://github.com/5136siegfried/cesu-pointage-geoloc" target="_blank">cesu-pointage-geoloc</a>
     par <a href="https://github.com/5136siegfried" target="_blank">5136siegfried</a>
   </div>
+</div>
 
 <script>
   let dernierType = null;
@@ -130,6 +165,16 @@
   window.addEventListener('online', viderAttente);
   document.addEventListener('DOMContentLoaded', () => { majAffichageAttente(); viderAttente(); });
 
+  // --- Bandeau de version ---
+  async function chargerVersion() {
+    try {
+      const res = await fetch('/api/version');
+      const d = await res.json();
+      document.getElementById('version-badge').innerText = '🧪 Test v' + d.version;
+    } catch (e) { /* pas bloquant */ }
+  }
+  chargerVersion();
+
   // --- Chargement de la config (salariées / clients) ---
   async function chargerConfig() {
     const res = await fetch('/api/config');
@@ -138,6 +183,8 @@
     const selCli = document.getElementById('client');
     selSal.innerHTML = cfg.salariees.map(s => `<option>${s}</option>`).join('');
     selCli.innerHTML = cfg.clients.map(c => `<option>${c}</option>`).join('');
+    selCli.addEventListener('change', chargerConsignes);
+    chargerConsignes(); // affichage initial pour le premier client sélectionné
   }
   chargerConfig();
 
@@ -225,18 +272,26 @@
     }
   }
 
-  // --- Consignes affichées directement sur la page ---
+  // --- Consignes affichées directement sur la page, propres au client sélectionné ---
   async function chargerConsignes() {
     const el = document.getElementById('consignes-texte');
+    const client = document.getElementById('client').value;
     try {
-      const res = await fetch('/api/consignes');
-      const data = await res.json();
-      el.innerText = data.texte || 'Aucune consigne pour le moment.';
+      const res = await fetch('/api/consignes?client=' + encodeURIComponent(client));
+      const d = await res.json();
+      let html = '';
+      if (d.conditions_medicales) {
+        html += `<p><strong>⚕️ Conditions médicales :</strong> ${d.conditions_medicales}</p>`;
+      }
+      if (d.contact_urgence_nom || d.contact_urgence_telephone) {
+        html += `<p><strong>📞 Contact à prévenir :</strong> ${d.contact_urgence_nom || ''} ${d.contact_urgence_telephone || ''}</p>`;
+      }
+      html += `<p>${d.consignes || 'Aucune consigne particulière.'}</p>`;
+      el.innerHTML = html;
     } catch (e) {
       el.innerText = 'Impossible de charger les consignes pour le moment.';
     }
   }
-  chargerConsignes();
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js');

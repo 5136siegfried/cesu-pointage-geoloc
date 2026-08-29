@@ -8,11 +8,12 @@ from fastapi.responses import JSONResponse, HTMLResponse, RedirectResponse, Stre
 from fastapi.templating import Jinja2Templates
 from openpyxl import Workbook
 
-from config import CLIENTS, RAYON_TOLERANCE_METRES
+from config import RAYON_TOLERANCE_METRES, VERSION
 from db import (
     init_db, insert_pointage, get_pointages, set_verifie,
     get_pointage, update_pointage,
     get_employes, get_employe, add_employe, update_employe, delete_employe,
+    get_clients, get_client, get_client_by_nom, add_client, update_client, delete_client,
     get_kv, set_kv,
     get_planning, get_planning_item, add_planning, update_planning, delete_planning
 )
@@ -45,8 +46,13 @@ async def racine():
 async def config_publique():
     return {
         "salariees": [e["nom"] for e in get_employes(only_actifs=True)],
-        "clients": list(CLIENTS.keys())
+        "clients": [c["nom"] for c in get_clients(only_actifs=True)]
     }
+
+
+@app.get("/api/version")
+async def version_api():
+    return {"version": VERSION}
 
 
 @app.get("/api/bandeau")
@@ -59,14 +65,29 @@ async def bandeau_public():
 
 
 @app.get("/api/consignes")
-async def consignes_api():
-    return {"texte": get_kv("consignes_texte", "Aucune consigne pour le moment.")}
+async def consignes_api(client: str = None):
+    if not client:
+        return {"nom": "", "prenom": "", "conditions_medicales": "",
+                "contact_urgence_nom": "", "contact_urgence_telephone": "",
+                "consignes": "Sélectionnez un client."}
+    c = get_client_by_nom(client)
+    if not c:
+        return {"nom": client, "prenom": "", "conditions_medicales": "",
+                "contact_urgence_nom": "", "contact_urgence_telephone": "",
+                "consignes": "Client inconnu."}
+    return {
+        "nom": c["nom"], "prenom": c["prenom"] or "",
+        "conditions_medicales": c["conditions_medicales"] or "",
+        "contact_urgence_nom": c["contact_urgence_nom"] or "",
+        "contact_urgence_telephone": c["contact_urgence_telephone"] or "",
+        "consignes": c["consignes"] or ""
+    }
 
 
 @app.get("/consignes", response_class=HTMLResponse)
-async def consignes_publiques(request: Request):
-    texte = get_kv("consignes_texte", "Aucune consigne pour le moment.")
-    return templates.TemplateResponse("consignes_public.html", {"request": request, "texte": texte})
+async def consignes_publiques(request: Request, client: str = None):
+    c = get_client_by_nom(client) if client else None
+    return templates.TemplateResponse("consignes_public.html", {"request": request, "c": c})
 
 
 @app.post("/api/pointage")
@@ -84,7 +105,7 @@ async def pointage(request: Request):
         if not type_ or not salariee or not client:
             return JSONResponse({"ok": False, "error": "Champs manquants."}, status_code=400)
 
-        ref = CLIENTS.get(client)
+        ref = get_client_by_nom(client)
         distance = None
         detail = ""
 
@@ -141,7 +162,7 @@ async def fiche_pointage(request: Request, pid: int):
         "request": request,
         "p": get_pointage(pid),
         "employes": get_employes(),  # tous, y compris inactifs, au cas où le pointage les référence
-        "clients": list(CLIENTS.keys())
+        "clients": [c["nom"] for c in get_clients()]  # tous, y compris inactifs
     })
 
 
@@ -205,8 +226,12 @@ async def liste_employes(request: Request):
 
 
 @app.post("/admin/employes")
-async def creer_employe(nom: str = Form(...), taux_horaire: float = Form(...), notes: str = Form("")):
-    add_employe(nom, taux_horaire, notes)
+async def creer_employe(
+    nom: str = Form(...), taux_horaire: float = Form(...),
+    telephone: str = Form(""), numero_secu: str = Form(""),
+    date_naissance: str = Form(""), adresse: str = Form(""), notes: str = Form("")
+):
+    add_employe(nom, taux_horaire, telephone, numero_secu, date_naissance, adresse, notes)
     return RedirectResponse("/admin/employes", status_code=303)
 
 
@@ -221,10 +246,14 @@ async def modifier_employe(
     emp_id: int,
     nom: str = Form(...),
     taux_horaire: float = Form(...),
+    telephone: str = Form(""),
+    numero_secu: str = Form(""),
+    date_naissance: str = Form(""),
+    adresse: str = Form(""),
     notes: str = Form(""),
     actif: str = Form(None)
 ):
-    update_employe(emp_id, nom, taux_horaire, notes, actif is not None)
+    update_employe(emp_id, nom, taux_horaire, telephone, numero_secu, date_naissance, adresse, notes, actif is not None)
     return RedirectResponse("/admin/employes", status_code=303)
 
 
@@ -244,7 +273,7 @@ async def planning_admin(request: Request):
         "jours": JOURS,
         "suivi_semaine": planning_vs_reel_semaine(),
         "employes": get_employes(only_actifs=True),
-        "clients": list(CLIENTS.keys())
+        "clients": [c["nom"] for c in get_clients(only_actifs=True)]
     })
 
 
@@ -264,7 +293,7 @@ async def fiche_planning(request: Request, pid: int):
         "p": get_planning_item(pid),
         "jours": JOURS,
         "employes": get_employes(only_actifs=True),
-        "clients": list(CLIENTS.keys())
+        "clients": [c["nom"] for c in get_clients(only_actifs=True)]
     })
 
 
@@ -283,18 +312,46 @@ async def supprimer_planning(pid: int):
     return RedirectResponse("/admin/planning", status_code=303)
 
 
-# ============ Admin — consignes ============
+# ============ Admin — clients (sites) ============
 
-@app.get("/admin/consignes", response_class=HTMLResponse)
-async def consignes_admin(request: Request):
-    texte = get_kv("consignes_texte", "")
-    return templates.TemplateResponse("consignes.html", {"request": request, "texte": texte})
+@app.get("/admin/clients", response_class=HTMLResponse)
+async def liste_clients(request: Request):
+    return templates.TemplateResponse("clients.html", {"request": request, "clients": get_clients()})
 
 
-@app.post("/admin/consignes")
-async def enregistrer_consignes(texte: str = Form(...)):
-    set_kv("consignes_texte", texte)
-    return RedirectResponse("/admin/consignes", status_code=303)
+@app.post("/admin/clients")
+async def creer_client(
+    nom: str = Form(...), lat: float = Form(...), lng: float = Form(...),
+    prenom: str = Form(""), conditions_medicales: str = Form(""),
+    contact_urgence_nom: str = Form(""), contact_urgence_telephone: str = Form(""),
+    consignes: str = Form(""), notes: str = Form("")
+):
+    add_client(nom, lat, lng, prenom, conditions_medicales, contact_urgence_nom,
+               contact_urgence_telephone, consignes, notes)
+    return RedirectResponse("/admin/clients", status_code=303)
+
+
+@app.get("/admin/clients/{cid}", response_class=HTMLResponse)
+async def fiche_client(request: Request, cid: int):
+    return templates.TemplateResponse("client_detail.html", {"request": request, "c": get_client(cid)})
+
+
+@app.post("/admin/clients/{cid}/edit")
+async def modifier_client(
+    cid: int, nom: str = Form(...), lat: float = Form(...), lng: float = Form(...),
+    prenom: str = Form(""), conditions_medicales: str = Form(""),
+    contact_urgence_nom: str = Form(""), contact_urgence_telephone: str = Form(""),
+    consignes: str = Form(""), notes: str = Form(""), actif: str = Form(None)
+):
+    update_client(cid, nom, lat, lng, prenom, conditions_medicales, contact_urgence_nom,
+                  contact_urgence_telephone, consignes, notes, actif is not None)
+    return RedirectResponse("/admin/clients", status_code=303)
+
+
+@app.post("/admin/clients/{cid}/supprimer")
+async def supprimer_client(cid: int):
+    delete_client(cid)
+    return RedirectResponse("/admin/clients", status_code=303)
 
 
 # ============ Admin — bandeau d'alerte ============
